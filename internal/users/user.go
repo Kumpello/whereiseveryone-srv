@@ -56,8 +56,6 @@ type Adapter interface {
 	AcceptFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
 	RejectFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
 	UnfriendUser(ctx context.Context, user id.ID, userToUnfriend id.ID) error
-	GetPendingIncomingFriendRequests(ctx context.Context, user id.ID) ([]User, error)
-	GetPendingOutgoingFriendRequests(ctx context.Context, user id.ID) ([]User, error)
 }
 
 var ErrUserNotExists = mongo.ErrNoDocuments
