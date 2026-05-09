@@ -63,7 +63,7 @@ func (m *mux) updateStatus(c echo.Context) error {
 // getFriends
 //
 // @summary get friends details
-// @description returns all details about observed users
+// @description returns accepted friends and pending friend requests
 // @tags me
 // @produce json
 // @success 200 {object} getFriendsResponse
@@ -162,7 +162,7 @@ func (m *mux) getFriends(c echo.Context) error {
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
-// @router /me/updateLocation [PUT]
+// @router /me/location [PUT]
 func (m *mux) updateLocation(c echo.Context) error {
 	request, bindErr := binder.BindRequest[updateLocationRequest](c, true)
 	if bindErr != nil {
@@ -188,8 +188,8 @@ func (m *mux) updateLocation(c echo.Context) error {
 
 // befriend
 //
-// @summary befriend the user
-// @description add the user to pending friend list
+// @summary send friend request
+// @description sends friend request to another user
 // @tags me
 // @accept json
 // @param user body friendRequest true "user to friend"
@@ -197,7 +197,7 @@ func (m *mux) updateLocation(c echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
-// @router /me/befriend [POST]
+// @router /me/friend [POST]
 func (m *mux) befriend(c echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
@@ -251,8 +251,8 @@ func (m *mux) befriend(c echo.Context) error {
 
 // unfriend
 //
-// @summary unfriend the user
-// @description stop being friends with the user, if user is not friends, nothing happen
+// @summary remove friend
+// @description removes friend and clears pending requests between users
 // @tags me
 // @accept json
 // @param user body friendRequest true "user to unfriend"
@@ -284,6 +284,18 @@ func (m *mux) unfriend(c echo.Context) error {
 	return c.NoContent(204)
 }
 
+// acceptFriend
+//
+// @summary accept friend request
+// @description accepts pending friend request from another user
+// @tags me
+// @accept json
+// @param user body friendRequest true "user to accept"
+// @success 204
+// @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 404 {object} jsonerr.JSONError "requested user not exists"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/friend/accept [POST]
 func (m *mux) acceptFriend(c echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
@@ -317,6 +329,18 @@ func (m *mux) acceptFriend(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// rejectFriend
+//
+// @summary reject friend request
+// @description rejects pending friend request from another user
+// @tags me
+// @accept json
+// @param user body friendRequest true "user to reject"
+// @success 204
+// @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 404 {object} jsonerr.JSONError "requested user not exists"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/friend/reject [POST]
 func (m *mux) rejectFriend(c echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
