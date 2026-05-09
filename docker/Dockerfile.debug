@@ -1,0 +1,31 @@
+FROM golang:1.26.2-alpine AS builder
+
+ARG project
+RUN CGO_ENABLED=0 go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
+RUN apk add --no-cache git
+
+WORKDIR /tmp/build
+
+COPY go.mod .
+COPY go.sum .
+
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 go build -gcflags "all=-N -l" -o ./out/app-srv ./cmd/server/main.go
+RUN go build -o ./out/app-cli ./cmd/cli/main.go
+
+FROM alpine:3.20
+
+WORKDIR /app
+
+COPY --from=builder /tmp/build/out/app-srv /app/app-srv
+COPY --from=builder /tmp/build/out/app-cli /app/app-cli
+COPY --from=builder /tmp/build/.env /app/.env
+COPY --from=builder /tmp/build/docs /app/docs
+COPY --from=builder /go/bin/dlv /go/bin/dlv
+
+EXPOSE 8080 40000
+
+CMD ["/go/bin/dlv","--listen=:40000","--headless=true","--log=true","--accept-multiclient","--api-version=2","exec","/app/app-srv","--","--config=/app/.env/docker.json"]

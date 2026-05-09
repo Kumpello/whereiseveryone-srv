@@ -1,0 +1,22 @@
+
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Remote Docker App",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "port": 40000,
+            "host": "localhost",
+            "apiVersion": 2,
+            "remotePath": "/app",
+            "substitutePath": [
+                {
+                    "from": "${workspaceFolder}",
+                    "to": "/tmp/build"
+                }
+            ]
+        }
+    ]
+}

@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"slices"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
 	"whereiseveryone/pkg/pointers"
 	"whereiseveryone/pkg/timer"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type User struct {
@@ -26,10 +27,13 @@ type User struct {
 	Status string `bson:"status"`
 
 	// ObservedUsers list of IDs user subscribe
-	// NOTE: The second user should accept subscription.
-	//		 For now, before returning those user data,
-	//		 we need to make sure both users subscribes each other.
 	SubscribedUsers []id.ID `bson:"subscribed_users"`
+
+	// PendingIncomingFriendRequests list of IDs of users that
+	PendingIncomingFriendRequests []id.ID `bson:"pending_incoming_friend_requests"`
+
+	// PendingOutgoingFriendRequests list of IDs of users that
+	PendingOutgoingFriendRequests []id.ID `bson:"pending_outgoing_friend_requests"`
 }
 
 func (u User) SubscribeUser(id id.ID) bool {
@@ -47,8 +51,13 @@ type Adapter interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 
 	UpdateStatus(ctx context.Context, user id.ID, newStatus string) error
-	ObserveUser(ctx context.Context, user id.ID, userToObserve id.ID) error
-	UnobserveUser(ctx context.Context, user id.ID, userToUnobserve id.ID) error
+	AddFriend(ctx context.Context, user id.ID, userToObserve id.ID) error
+	SendFriendRequest(ctx context.Context, from id.ID, to id.ID) error
+	AcceptFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
+	RejectFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
+	UnfriendUser(ctx context.Context, user id.ID, userToUnfriend id.ID) error
+	GetPendingIncomingFriendRequests(ctx context.Context, user id.ID) ([]User, error)
+	GetPendingOutgoingFriendRequests(ctx context.Context, user id.ID) ([]User, error)
 }
 
 var ErrUserNotExists = mongo.ErrNoDocuments
@@ -152,14 +161,13 @@ func (m *mongoUserAdapter) GetUserByUsername(ctx context.Context, name string) (
 		"auth.username": name,
 	}
 
-	res := m.coll.FindOne(ctx, filter)
-	if err := res.Err(); err != nil {
-		return User{}, fmt.Errorf("perform query: %w", err)
-	}
-
 	var user User
-	if err := res.Decode(&user); err != nil {
-		return User{}, fmt.Errorf("decode query result: %w", err)
+	err := m.coll.FindOne(ctx, filter).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return User{}, ErrUserNotExists
+		}
+		return User{}, fmt.Errorf("find user by username: %w", err)
 	}
 
 	return user, nil
@@ -181,8 +189,13 @@ func (m *mongoUserAdapter) UpdateStatus(ctx context.Context, userId id.ID, newSt
 	return nil
 }
 
-func (m *mongoUserAdapter) ObserveUser(ctx context.Context, user id.ID, userToObserve id.ID) error {
+func (m *mongoUserAdapter) AddFriend(
+	ctx context.Context,
+	user id.ID,
+	userToObserve id.ID,
+) error {
 	filter := withUserId(user)
+
 	update := bson.M{
 		"$addToSet": bson.M{
 			"subscribed_users": userToObserve,
@@ -197,17 +210,130 @@ func (m *mongoUserAdapter) ObserveUser(ctx context.Context, user id.ID, userToOb
 	return nil
 }
 
-func (m *mongoUserAdapter) UnobserveUser(ctx context.Context, user id.ID, userToUnobserve id.ID) error {
-	filter := withUserId(user)
-	update := bson.M{
-		"$pull": bson.M{
-			"subscribed_users": userToUnobserve,
+func (m *mongoUserAdapter) SendFriendRequest(
+	ctx context.Context,
+	from id.ID,
+	to id.ID,
+) error {
+	// Add incoming request to target user
+	_, err := m.coll.UpdateOne(
+		ctx,
+		withUserId(to),
+		bson.M{
+			"$addToSet": bson.M{
+				"pending_incoming_friend_requests": from,
+			},
 		},
+	)
+	if err != nil {
+		return fmt.Errorf("add incoming friend request: %w", err)
 	}
 
-	_, err := m.coll.UpdateOne(ctx, filter, update)
+	// Add outgoing request to requester
+	_, err = m.coll.UpdateOne(
+		ctx,
+		withUserId(from),
+		bson.M{
+			"$addToSet": bson.M{
+				"pending_outgoing_friend_requests": to,
+			},
+		},
+	)
 	if err != nil {
-		return fmt.Errorf("observe user: %w", err)
+		return fmt.Errorf("add outgoing friend request: %w", err)
+	}
+
+	return nil
+}
+
+func (m *mongoUserAdapter) UnfriendUser(
+	ctx context.Context,
+	user id.ID,
+	userToUnfriend id.ID,
+) error {
+	_, err := m.coll.UpdateOne(
+		ctx,
+		withUserId(user),
+		bson.M{
+			"$pull": bson.M{
+				"subscribed_users": userToUnfriend,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("remove friend from user: %w", err)
+	}
+
+	_, err = m.coll.UpdateOne(
+		ctx,
+		withUserId(userToUnfriend),
+		bson.M{
+			"$pull": bson.M{
+				"subscribed_users": user,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("remove user from friend: %w", err)
+	}
+
+	return nil
+}
+
+func (m *mongoUserAdapter) AcceptFriendRequest(
+	ctx context.Context,
+	user id.ID,
+	requester id.ID,
+) error {
+	err := m.RejectFriendRequest(ctx, user, requester)
+	if err != nil {
+		return err
+	}
+
+	err = m.AddFriend(ctx, user, requester)
+	if err != nil {
+		return err
+	}
+
+	err = m.AddFriend(ctx, requester, user)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *mongoUserAdapter) RejectFriendRequest(
+	ctx context.Context,
+	user id.ID,
+	requester id.ID,
+) error {
+	// Remove incoming request
+	_, err := m.coll.UpdateOne(
+		ctx,
+		withUserId(user),
+		bson.M{
+			"$pull": bson.M{
+				"pending_incoming_friend_requests": requester,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("remove incoming request: %w", err)
+	}
+
+	// Remove outgoing request
+	_, err = m.coll.UpdateOne(
+		ctx,
+		withUserId(requester),
+		bson.M{
+			"$pull": bson.M{
+				"pending_outgoing_friend_requests": user,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("remove outgoing request: %w", err)
 	}
 
 	return nil

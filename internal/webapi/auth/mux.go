@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"github.com/labstack/echo/v4"
 	"time"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -11,6 +10,8 @@ import (
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/jwt"
 	"whereiseveryone/pkg/timer"
+
+	"github.com/labstack/echo/v4"
 )
 
 type mux struct {
@@ -72,6 +73,9 @@ func (m *mux) signUp(c echo.Context) error {
 			CreatedAt:    m.timer.Now(),
 			UpdatedAt:    m.timer.Now(),
 		},
+		SubscribedUsers:               []id.ID{},
+		PendingIncomingFriendRequests: []id.ID{},
+		PendingOutgoingFriendRequests: []id.ID{},
 	}
 
 	if u, err = m.userAdapter.NewUser(reqCtx, u); err != nil { // overwrite user for ID and generated data
@@ -152,4 +156,4 @@ func (m *mux) logIn(c echo.Context) error {
 	})
 }
 
-// TODO: Add refresh-token endpoint.
+// TODO: Add refresh-token endpoint.+
