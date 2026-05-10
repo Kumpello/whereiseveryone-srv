@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/timer"
+
+	"github.com/golang-jwt/jwt"
 )
 
 type JWT struct {
@@ -76,4 +77,28 @@ func (j JWT) ValidateToken(signed string) (SignedToken, error) {
 	}
 
 	return *claims, nil
+}
+
+func (j JWT) ValidateRefreshToken(signed string) error {
+	token, err := jwt.ParseWithClaims(
+		signed,
+		&jwt.StandardClaims{},
+		func(token *jwt.Token) (any, error) {
+			return j.secret, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("parse refresh token: %w", err)
+	}
+
+	claims, ok := token.Claims.(*jwt.StandardClaims)
+	if !ok {
+		return fmt.Errorf("invalid refresh token")
+	}
+
+	if claims.ExpiresAt < j.timer.Now().Unix() {
+		return ErrTokenExpired
+	}
+
+	return nil
 }

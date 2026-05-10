@@ -22,3 +22,7 @@ type authResponse struct {
 	// RefreshToken user refresh token
 	RefreshToken string `json:"refresh_token"`
 }
+
+type refreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}

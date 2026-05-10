@@ -31,6 +31,7 @@ func NewMux(
 func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.POST("/signup", m.signUp)
 	g.POST("/login", m.logIn)
+	g.POST("/refresh", m.refreshToken)
 }
 
 // signUp
@@ -156,4 +157,79 @@ func (m *mux) logIn(c echo.Context) error {
 	})
 }
 
-// TODO: Add refresh-token endpoint.+
+// refreshToken
+//
+// @summary refresh auth tokens
+// @description generates new access and refresh tokens
+// @tags auth
+// @accept json
+// @produces json
+// @param refresh body refreshTokenRequest true "refresh token"
+// @success 200 {object} authResponse
+// @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 403 {object} jsonerr.JSONError "invalid refresh token"
+// @failure 404 {object} jsonerr.JSONError "user not exists"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /auth/refresh [POST]
+func (m *mux) refreshToken(c echo.Context) error {
+	reqCtx, cancel := context.WithTimeout(
+		c.Request().Context(),
+		60*time.Second,
+	)
+	defer cancel()
+
+	var request refreshTokenRequest
+
+	if err := c.Bind(&request); err != nil {
+		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+
+	if err := c.Validate(request); err != nil {
+		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+
+	// Validate JWT structure and expiration
+	if err := m.jwt.ValidateRefreshToken(
+		request.RefreshToken,
+	); err != nil {
+		return jsonerr.EchoForbiddenError().Echo(c)
+	}
+
+	// Find user owning refresh token
+	u, err := m.userAdapter.GetUserByRefreshToken(
+		reqCtx,
+		request.RefreshToken,
+	)
+	if err != nil {
+		if errors.Is(err, users.ErrUserNotExists) {
+			return jsonerr.EchoForbiddenError().Echo(c)
+		}
+
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	// Rotate tokens
+	token, refresh, err := m.jwt.GenerateTokens(
+		u.Auth.Username,
+		u.ID,
+	)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	err = m.userAdapter.UpdateTokens(
+		reqCtx,
+		u.ID,
+		&token,
+		&refresh,
+	)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	return c.JSON(200, authResponse{
+		ID:           u.ID.Hex(),
+		Token:        token,
+		RefreshToken: refresh,
+	})
+}
