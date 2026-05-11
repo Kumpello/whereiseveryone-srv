@@ -40,6 +40,7 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 // @param status body updateStatusRequest true "update status object"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/status [PUT]
 func (m *mux) updateStatus(c echo.Context) error {
@@ -67,6 +68,7 @@ func (m *mux) updateStatus(c echo.Context) error {
 // @tags me
 // @produce json
 // @success 200 {object} getFriendsResponse
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friends [GET]
 func (m *mux) getFriends(c echo.Context) error {
@@ -161,6 +163,7 @@ func (m *mux) getFriends(c echo.Context) error {
 // @param location body updateLocationRequest true "update location object"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/location [PUT]
 func (m *mux) updateLocation(c echo.Context) error {
@@ -195,6 +198,7 @@ func (m *mux) updateLocation(c echo.Context) error {
 // @param user body friendRequest true "user to friend"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend [POST]
@@ -258,6 +262,7 @@ func (m *mux) befriend(c echo.Context) error {
 // @param user body friendRequest true "user to unfriend"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend [DELETE]
@@ -293,6 +298,7 @@ func (m *mux) unfriend(c echo.Context) error {
 // @param user body friendRequest true "user to accept"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend/accept [POST]
@@ -338,6 +344,7 @@ func (m *mux) acceptFriend(c echo.Context) error {
 // @param user body friendRequest true "user to reject"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend/reject [POST]

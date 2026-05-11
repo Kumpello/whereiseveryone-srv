@@ -3,6 +3,7 @@ package jsonerr
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -52,6 +53,10 @@ func EchoError(code int, message string, err error) *JSONError {
 
 func EchoInvalidRequestError(err error) *JSONError {
 	return EchoError(400, "invalid request", err)
+}
+
+func EchoInvalidTokenError(err error) *JSONError {
+	return EchoError(401, "expired token", err)
 }
 
 func EchoNotFoundError(err error) *JSONError {

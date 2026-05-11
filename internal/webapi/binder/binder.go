@@ -2,13 +2,14 @@ package binder
 
 import (
 	"context"
-	"github.com/labstack/echo/v4"
 	"reflect"
 	"time"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/jwt"
+
+	"github.com/labstack/echo/v4"
 )
 
 // BaseContext is interface over Context without generic type

@@ -3,13 +3,15 @@ package webapi
 import (
 	"errors"
 	"fmt"
-	"github.com/labstack/echo/v4/middleware"
 	"strings"
+
+	"github.com/labstack/echo/v4/middleware"
+
+	"whereiseveryone/pkg/jwt"
+	"whereiseveryone/pkg/logger"
 
 	"github.com/go-playground/validator"
 	"github.com/labstack/echo/v4"
-	"whereiseveryone/pkg/jwt"
-	"whereiseveryone/pkg/logger"
 )
 
 type Router interface {
@@ -65,7 +67,11 @@ func NewEcho(
 
 			v, err := jwtInstance.ValidateToken(strings.TrimPrefix(jwtToken, "Bearer "))
 			if err != nil {
-				return c.String(403, fmt.Sprintf("invalid token: %s", err.Error()))
+				if errors.Is(err, jwt.ErrTokenExpired) {
+					return c.String(401, "token expired")
+				} else {
+					return c.String(403, fmt.Sprintf("invalid token: %s", err.Error()))
+				}
 			}
 			c.Set("user", v)
 
