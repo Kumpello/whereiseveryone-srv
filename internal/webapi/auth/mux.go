@@ -167,6 +167,7 @@ func (m *mux) logIn(c echo.Context) error {
 // @param refresh body refreshTokenRequest true "refresh token"
 // @success 200 {object} authResponse
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 401 {object} jsonerr.JSONError "expired refresh token"
 // @failure 403 {object} jsonerr.JSONError "invalid refresh token"
 // @failure 404 {object} jsonerr.JSONError "user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
@@ -189,16 +190,24 @@ func (m *mux) refreshToken(c echo.Context) error {
 	}
 
 	// Validate JWT structure and expiration
-	if err := m.jwt.ValidateRefreshToken(
-		request.RefreshToken,
-	); err != nil {
+	v, err := m.jwt.ValidateToken(request.RefreshToken)
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return jsonerr.EchoExpiredTokenError().Echo(c)
+		} else {
+			return jsonerr.EchoForbiddenError().Echo(c)
+		}
+	}
+
+	userID, err := id.FromString(v.ID)
+	if err != nil {
 		return jsonerr.EchoForbiddenError().Echo(c)
 	}
 
 	// Find user owning refresh token
-	u, err := m.userAdapter.GetUserByRefreshToken(
+	u, err := m.userAdapter.GetUser(
 		reqCtx,
-		request.RefreshToken,
+		userID,
 	)
 	if err != nil {
 		if errors.Is(err, users.ErrUserNotExists) {

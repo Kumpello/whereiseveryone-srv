@@ -55,8 +55,8 @@ func EchoInvalidRequestError(err error) *JSONError {
 	return EchoError(400, "invalid request", err)
 }
 
-func EchoInvalidTokenError(err error) *JSONError {
-	return EchoError(401, "expired token", err)
+func EchoExpiredTokenError() *JSONError {
+	return EchoError(401, "expired token", nil)
 }
 
 func EchoNotFoundError(err error) *JSONError {

@@ -54,12 +54,8 @@ func NewMongoWithPassword(ctx context.Context, db, uri, authDB, user, pass strin
 
 func newMongo(ctx context.Context, db string, opts *options.ClientOptions) (*Collections, error) {
 
-	cl, err := mongo.NewClient(opts)
+	cl, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		return nil, fmt.Errorf("create mongo client: %w", err)
-	}
-
-	if err := cl.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("connect to the db: %w", err)
 	}
 

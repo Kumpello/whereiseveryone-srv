@@ -12,13 +12,14 @@ import (
 )
 
 type JWT struct {
-	timer    timer.Timer
-	secret   []byte
-	validity time.Duration
+	timer           timer.Timer
+	secret          []byte
+	validity        time.Duration
+	refreshValidity time.Duration
 }
 
-func NewJWT(timer timer.Timer, secret []byte, validity time.Duration) *JWT {
-	return &JWT{timer: timer, secret: secret, validity: validity}
+func NewJWT(timer timer.Timer, secret []byte, validity time.Duration, refreshValidity time.Duration) *JWT {
+	return &JWT{timer: timer, secret: secret, validity: validity, refreshValidity: refreshValidity}
 }
 
 type SignedToken struct {
@@ -40,7 +41,7 @@ func (j JWT) GenerateTokens(username string, id id.ID) (string, string, error) {
 	}
 
 	refresh := jwt.StandardClaims{
-		ExpiresAt: j.timer.Now().Add(j.validity).Unix(),
+		ExpiresAt: j.timer.Now().Add(j.refreshValidity).Unix(),
 	}
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(j.secret)
@@ -77,28 +78,4 @@ func (j JWT) ValidateToken(signed string) (SignedToken, error) {
 	}
 
 	return *claims, nil
-}
-
-func (j JWT) ValidateRefreshToken(signed string) error {
-	token, err := jwt.ParseWithClaims(
-		signed,
-		&jwt.StandardClaims{},
-		func(token *jwt.Token) (any, error) {
-			return j.secret, nil
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("parse refresh token: %w", err)
-	}
-
-	claims, ok := token.Claims.(*jwt.StandardClaims)
-	if !ok {
-		return fmt.Errorf("invalid refresh token")
-	}
-
-	if claims.ExpiresAt < j.timer.Now().Unix() {
-		return ErrTokenExpired
-	}
-
-	return nil
 }

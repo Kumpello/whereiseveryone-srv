@@ -49,7 +49,6 @@ type Adapter interface {
 	GetUser(ctx context.Context, userID id.ID) (User, error)
 	GetUsers(ctx context.Context, ids []id.ID) ([]User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	GetUserByRefreshToken(ctx context.Context, refreshToken string) (User, error)
 
 	UpdateStatus(ctx context.Context, user id.ID, newStatus string) error
 	AddFriend(ctx context.Context, user id.ID, userToObserve id.ID) error
@@ -167,31 +166,6 @@ func (m *mongoUserAdapter) GetUserByUsername(ctx context.Context, name string) (
 			return User{}, ErrUserNotExists
 		}
 		return User{}, fmt.Errorf("find user by username: %w", err)
-	}
-
-	return user, nil
-}
-
-func (m *mongoUserAdapter) GetUserByRefreshToken(
-	ctx context.Context,
-	refreshToken string,
-) (User, error) {
-	filter := bson.M{
-		"auth.refresh_token": refreshToken,
-	}
-
-	var user User
-
-	err := m.coll.FindOne(ctx, filter).Decode(&user)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return User{}, ErrUserNotExists
-		}
-
-		return User{}, fmt.Errorf(
-			"find user by refresh token: %w",
-			err,
-		)
 	}
 
 	return user, nil

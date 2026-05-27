@@ -4,12 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	echoSwagger "github.com/swaggo/echo-swagger"
 	"time"
 	"whereiseveryone/internal/config"
 
-	"github.com/go-playground/validator"
+	"github.com/sirupsen/logrus"
+	echoSwagger "github.com/swaggo/echo-swagger"
+
 	"whereiseveryone/internal/mongo"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
@@ -20,8 +20,11 @@ import (
 	"whereiseveryone/pkg/logger"
 	"whereiseveryone/pkg/timer"
 
-	_ "github.com/swaggo/echo-swagger" // echo-swagger middleware
+	"github.com/go-playground/validator"
+
 	_ "whereiseveryone/docs"
+
+	_ "github.com/swaggo/echo-swagger" // echo-swagger middleware
 )
 
 // @title WhereIsEveryone
@@ -68,7 +71,7 @@ func main() {
 	// Echo
 	jwtSecret := envHandler.MustEnv(config.ConfJwtSecret)
 	// TODO: Get VALIDITY from config
-	jwtInstance := jwt.NewJWT(utcTimer, []byte(jwtSecret), time.Duration(168)*time.Hour)
+	jwtInstance := jwt.NewJWT(utcTimer, []byte(jwtSecret), time.Duration(15)*time.Minute, time.Duration(720)*time.Hour)
 
 	authRouter := authMux.NewMux(usersAdapter, utcTimer, jwtInstance)
 	meRouter := meMux.NewMux(usersAdapter, utcTimer)
