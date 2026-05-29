@@ -118,9 +118,14 @@ func (m *mux) getFriends(c echo.Context) error {
 	}
 
 	// Incoming pending requests
+	incomingUserIDs, err := m.userAdapter.GetPendingIncomingFriendRequestUserIDs(ctx, user.ID)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
 	incomingUsers, err := m.userAdapter.GetUsers(
 		ctx,
-		user.PendingIncomingFriendRequests,
+		incomingUserIDs,
 	)
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
@@ -135,9 +140,14 @@ func (m *mux) getFriends(c echo.Context) error {
 	}
 
 	// Outgoing pending requests
+	outgoingUserIDs, err := m.userAdapter.GetPendingOutgoingFriendRequestUserIDs(ctx, user.ID)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
 	outgoingUsers, err := m.userAdapter.GetUsers(
 		ctx,
-		user.PendingOutgoingFriendRequests,
+		outgoingUserIDs,
 	)
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)

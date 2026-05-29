@@ -19,7 +19,8 @@ type Indexable interface {
 type Collections struct {
 	client *mongo.Client
 
-	Users *mongo.Collection
+	Users                 *mongo.Collection
+	PendingFriendRequests *mongo.Collection
 }
 
 func (c *Collections) Disconnect(ctx context.Context) error {
@@ -66,7 +67,8 @@ func newMongo(ctx context.Context, db string, opts *options.ClientOptions) (*Col
 	appDB := cl.Database(db)
 
 	return &Collections{
-		client: cl,
-		Users:  appDB.Collection("users"),
+		client:                cl,
+		Users:                 appDB.Collection("users"),
+		PendingFriendRequests: appDB.Collection("pending_friend_requests"),
 	}, nil
 }

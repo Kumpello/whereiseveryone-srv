@@ -28,12 +28,6 @@ type User struct {
 
 	// ObservedUsers list of IDs user subscribe
 	SubscribedUsers []id.ID `bson:"subscribed_users"`
-
-	// PendingIncomingFriendRequests list of IDs of users that
-	PendingIncomingFriendRequests []id.ID `bson:"pending_incoming_friend_requests"`
-
-	// PendingOutgoingFriendRequests list of IDs of users that
-	PendingOutgoingFriendRequests []id.ID `bson:"pending_outgoing_friend_requests"`
 }
 
 func (u User) SubscribeUser(id id.ID) bool {
@@ -49,6 +43,8 @@ type Adapter interface {
 	GetUser(ctx context.Context, userID id.ID) (User, error)
 	GetUsers(ctx context.Context, ids []id.ID) ([]User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetPendingIncomingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
+	GetPendingOutgoingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
 
 	UpdateStatus(ctx context.Context, user id.ID, newStatus string) error
 	AddFriend(ctx context.Context, user id.ID, userToObserve id.ID) error
@@ -64,16 +60,29 @@ var ErrUserNameAlreadyExists = errors.New("username is already in use")
 type mongoUserAdapter struct {
 	locationAdapter
 	authAdapter
+	pendingFriendRequestAdapter
 
 	coll   *mongo.Collection
 	logger logger.Logger
 }
 
-func NewMongoAdapter(coll *mongo.Collection, timer timer.Timer, logger logger.Logger) *mongoUserAdapter {
+func NewMongoAdapter(
+	coll *mongo.Collection,
+	pendingFriendRequestsColl *mongo.Collection,
+	timer timer.Timer,
+	logger logger.Logger,
+) *mongoUserAdapter {
 	locationAdapter := mongoLocationAdapter{coll, logger}
 	authAdapter := mongoAuthAdapter{coll, timer, logger}
+	pendingFriendRequestAdapter := mongoPendingFriendRequestAdapter{pendingFriendRequestsColl, logger}
 
-	return &mongoUserAdapter{locationAdapter, authAdapter, coll, logger}
+	return &mongoUserAdapter{
+		locationAdapter:             locationAdapter,
+		authAdapter:                 authAdapter,
+		pendingFriendRequestAdapter: pendingFriendRequestAdapter,
+		coll:                        coll,
+		logger:                      logger,
+	}
 }
 
 func (m *mongoUserAdapter) EnsureIndexes(ctx context.Context) error {
@@ -93,6 +102,10 @@ func (m *mongoUserAdapter) EnsureIndexes(ctx context.Context) error {
 	}
 
 	m.logger.Infof("Created index on field `auth.username`")
+
+	if err := m.pendingFriendRequestAdapter.EnsureIndexes(ctx); err != nil {
+		return fmt.Errorf("ensure pending friend request indexes: %w", err)
+	}
 
 	return nil
 }
@@ -213,35 +226,7 @@ func (m *mongoUserAdapter) SendFriendRequest(
 	from id.ID,
 	to id.ID,
 ) error {
-	// Add incoming request to target user
-	_, err := m.coll.UpdateOne(
-		ctx,
-		withUserId(to),
-		bson.M{
-			"$addToSet": bson.M{
-				"pending_incoming_friend_requests": from,
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("add incoming friend request: %w", err)
-	}
-
-	// Add outgoing request to requester
-	_, err = m.coll.UpdateOne(
-		ctx,
-		withUserId(from),
-		bson.M{
-			"$addToSet": bson.M{
-				"pending_outgoing_friend_requests": to,
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("add outgoing friend request: %w", err)
-	}
-
-	return nil
+	return m.pendingFriendRequestAdapter.SendFriendRequest(ctx, from, to)
 }
 
 func (m *mongoUserAdapter) UnfriendUser(
@@ -283,7 +268,7 @@ func (m *mongoUserAdapter) AcceptFriendRequest(
 	user id.ID,
 	requester id.ID,
 ) error {
-	err := m.RejectFriendRequest(ctx, user, requester)
+	err := m.DeleteFriendRequest(ctx, user, requester)
 	if err != nil {
 		return err
 	}
@@ -306,35 +291,7 @@ func (m *mongoUserAdapter) RejectFriendRequest(
 	user id.ID,
 	requester id.ID,
 ) error {
-	// Remove incoming request
-	_, err := m.coll.UpdateOne(
-		ctx,
-		withUserId(user),
-		bson.M{
-			"$pull": bson.M{
-				"pending_incoming_friend_requests": requester,
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("remove incoming request: %w", err)
-	}
-
-	// Remove outgoing request
-	_, err = m.coll.UpdateOne(
-		ctx,
-		withUserId(requester),
-		bson.M{
-			"$pull": bson.M{
-				"pending_outgoing_friend_requests": user,
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("remove outgoing request: %w", err)
-	}
-
-	return nil
+	return m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, requester)
 }
 
 var _ Adapter = (*mongoUserAdapter)(nil)
