@@ -66,7 +66,7 @@ func main() {
 		panic(err)
 	}
 	defer mongoCollections.Disconnect(appCtx)
-	usersAdapter := users.NewMongoAdapter(mongoCollections.Users, mongoCollections.FriendRequests, utcTimer, log)
+	usersAdapter := users.NewMongoAdapter(mongoCollections.Users, mongoCollections.PendingFriendRequests, utcTimer, log)
 
 	// Echo
 	jwtSecret := envHandler.MustEnv(config.ConfJwtSecret)
