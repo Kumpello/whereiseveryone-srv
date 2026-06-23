@@ -24,6 +24,7 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.PUT("/status", m.updateStatus)
 	g.GET("/friends", m.getFriends)
 	g.PUT("/location", m.updateLocation)
+	g.DELETE("/location", m.wipeLocation)
 	g.POST("/friend", m.befriend)
 	g.DELETE("/friend", m.unfriend)
 	g.POST("/friend/accept", m.acceptFriend)
@@ -192,6 +193,30 @@ func (m *mux) updateLocation(c echo.Context) error {
 		Accuracy:   newLoc.Accuracy,
 		LastUpdate: newLoc.LastUpdate,
 	})
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	return c.NoContent(204)
+}
+
+// wipeLocation
+//
+// @summary wipe location
+// @description nullify logged user location
+// @tags me
+// @success 204
+// @failure 401 {object} jsonerr.JSONError "invalid token"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/location [DELETE]
+func (m *mux) wipeLocation(c echo.Context) error {
+	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
+	if bindErr != nil {
+		return bindErr.Echo(c)
+	}
+	defer request.Cancel()
+
+	err := m.userAdapter.WipeLocation(request.Context(), request.UserID())
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}

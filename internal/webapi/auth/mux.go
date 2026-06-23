@@ -74,9 +74,7 @@ func (m *mux) signUp(c echo.Context) error {
 			CreatedAt:    m.timer.Now(),
 			UpdatedAt:    m.timer.Now(),
 		},
-		SubscribedUsers:               []id.ID{},
-		PendingIncomingFriendRequests: []id.ID{},
-		PendingOutgoingFriendRequests: []id.ID{},
+		SubscribedUsers: []id.ID{},
 	}
 
 	if u, err = m.userAdapter.NewUser(reqCtx, u); err != nil { // overwrite user for ID and generated data

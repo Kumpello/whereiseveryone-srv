@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Location struct {
@@ -28,6 +29,7 @@ type Location struct {
 
 type locationAdapter interface {
 	UpdateLocation(ctx context.Context, userID id.ID, newLocation Location) error
+	WipeLocation(ctx context.Context, userID id.ID) error
 }
 
 type mongoLocationAdapter struct {
@@ -49,6 +51,22 @@ func (l mongoLocationAdapter) UpdateLocation(ctx context.Context, userID id.ID, 
 	_, err := l.userCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("update user's location: %w", err)
+	}
+
+	return nil
+}
+
+func (l mongoLocationAdapter) WipeLocation(ctx context.Context, userID id.ID) error {
+	filter := withUserId(userID)
+	update := bson.M{
+		"$set": bson.M{
+			"location": nil,
+		},
+	}
+
+	_, err := l.userCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("wipe user's location: %w", err)
 	}
 
 	return nil
