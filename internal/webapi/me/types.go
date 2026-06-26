@@ -17,10 +17,10 @@ type updateStatusRequest struct {
 type getFriendsResponse []friendDetails
 
 type friendDetails struct {
-	Username string          `json:"username"`
-	Status   string          `json:"status"`
-	State    friendState     `json:"state"`
-	Location locationDetails `json:"location,omitempty"`
+	Username string           `json:"username"`
+	Status   string           `json:"status"`
+	State    friendState      `json:"state"`
+	Location *locationDetails `json:"location,omitempty"`
 }
 
 type locationDetails struct {

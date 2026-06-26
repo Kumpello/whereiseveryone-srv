@@ -3,6 +3,7 @@ package me
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/binder"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -29,6 +30,8 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.DELETE("/friend", m.unfriend)
 	g.POST("/friend/accept", m.acceptFriend)
 	g.POST("/friend/reject", m.rejectFriend)
+	g.POST("/sharing/stop", m.stopSharing)
+	g.POST("/sharing/resume", m.resumeSharing)
 }
 
 // updateStatus
@@ -104,8 +107,8 @@ func (m *mux) getFriends(c echo.Context) error {
 			State:    friendStateAccepted,
 		}
 
-		if u.Location != nil {
-			friend.Location = locationDetails{
+		if u.Location != nil && !slices.Contains(u.PausedUsers, user.ID) {
+			friend.Location = &locationDetails{
 				Longitude:  u.Location.Longitude,
 				Latitude:   u.Location.Latitude,
 				Altitude:   u.Location.Altitude,
@@ -408,6 +411,90 @@ func (m *mux) rejectFriend(c echo.Context) error {
 		ctx,
 		request.UserID(),
 		requester.ID,
+	)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// stopSharing
+//
+// @summary stop sharing location
+// @description stop sharing location with another user
+// @tags me
+// @accept json
+// @param user body friendRequest true "user to stop sharing with"
+// @success 204
+// @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/sharing/stop [POST]
+func (m *mux) stopSharing(c echo.Context) error {
+	request, bindErr := binder.BindRequest[friendRequest](c, true)
+	if bindErr != nil {
+		return bindErr.Echo(c)
+	}
+	defer request.Cancel()
+	ctx := request.Context()
+
+	target, err := m.userAdapter.GetUserByUsername(
+		ctx,
+		request.Request.Username,
+	)
+	if err != nil {
+		if errors.Is(err, users.ErrUserNotExists) {
+			return jsonerr.EchoError(http.StatusBadRequest, "user to stop sharing with not found", nil).Echo(c)
+		}
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	err = m.userAdapter.StopSharing(
+		ctx,
+		request.UserID(),
+		target.ID,
+	)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// resumeSharing
+//
+// @summary resume sharing location
+// @description resume sharing location with another user
+// @tags me
+// @accept json
+// @param user body friendRequest true "user to resume sharing with"
+// @success 204
+// @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/sharing/resume [POST]
+func (m *mux) resumeSharing(c echo.Context) error {
+	request, bindErr := binder.BindRequest[friendRequest](c, true)
+	if bindErr != nil {
+		return bindErr.Echo(c)
+	}
+	defer request.Cancel()
+	ctx := request.Context()
+
+	target, err := m.userAdapter.GetUserByUsername(
+		ctx,
+		request.Request.Username,
+	)
+	if err != nil {
+		if errors.Is(err, users.ErrUserNotExists) {
+			return jsonerr.EchoError(http.StatusBadRequest, "user to start sharing with not found", nil).Echo(c)
+		}
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	err = m.userAdapter.ResumeSharing(
+		ctx,
+		request.UserID(),
+		target.ID,
 	)
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)

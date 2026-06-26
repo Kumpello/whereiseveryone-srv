@@ -55,6 +55,8 @@ definitions:
     properties:
       location:
         $ref: '#/definitions/me.locationDetails'
+      state:
+        type: string
       status:
         type: string
       username:
@@ -75,6 +77,11 @@ definitions:
         type: number
       longitude:
         type: number
+    type: object
+  me.friendRequest:
+    properties:
+      username:
+        type: string
     type: object
   me.observeRequest:
     properties:
@@ -198,48 +205,18 @@ paths:
       summary: get friends details
       tags:
       - me
-  /me/observe:
-    delete:
-      consumes:
-      - application/json
-      description: stop observing the user, if user is not observed, nothing happen
-      parameters:
-      - description: user to unobserve
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/me.observeRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: invalid request
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "404":
-          description: requested user not exists
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "500":
-          description: internal server error
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-      summary: unobserve the user
-      tags:
-      - me
+  /me/friend:
     post:
       consumes:
       - application/json
-      description: start observing the user, the second user must observe requester
-        too to get his details
+      description: send friend request to another user
       parameters:
-      - description: user to observe
+      - description: user to friend
         in: body
         name: user
         required: true
         schema:
-          $ref: '#/definitions/me.observeRequest'
+          $ref: '#/definitions/me.friendRequest'
       responses:
         "204":
           description: No Content
@@ -255,7 +232,148 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
-      summary: observe the user
+      summary: send friend request
+      tags:
+      - me
+    delete:
+      consumes:
+      - application/json
+      description: remove friend and clear pending requests between users
+      parameters:
+      - description: user to unfriend
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: remove friend
+      tags:
+      - me
+  /me/friend/accept:
+    post:
+      consumes:
+      - application/json
+      description: accept a pending friend request from another user
+      parameters:
+      - description: user to accept
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: accept friend request
+      tags:
+      - me
+  /me/friend/reject:
+    post:
+      consumes:
+      - application/json
+      description: reject a pending friend request from another user
+      parameters:
+      - description: user to reject
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: reject friend request
+      tags:
+      - me
+  /me/sharing/stop:
+    post:
+      consumes:
+      - application/json
+      description: stop sharing location with another user
+      parameters:
+      - description: user to stop sharing with
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: stop sharing location
+      tags:
+      - me
+  /me/sharing/resume:
+    post:
+      consumes:
+      - application/json
+      description: resume sharing location with another user
+      parameters:
+      - description: user to resume sharing with
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: resume sharing location
       tags:
       - me
   /me/status:
@@ -286,7 +404,7 @@ paths:
       summary: update status
       tags:
       - me
-  /me/updateLocation:
+  /me/location:
     put:
       consumes:
       - application/json
@@ -310,6 +428,22 @@ paths:
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: update location
+      tags:
+      - me
+    delete:
+      description: nullify logged user location
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: wipe location
       tags:
       - me
 securityDefinitions:

@@ -145,24 +145,24 @@
                 }
             }
         },
-        "/me/observe": {
+        "/me/friend": {
             "post": {
-                "description": "start observing the user, the second user must observe requester too to get his details",
+                "description": "send friend request to another user",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "me"
                 ],
-                "summary": "observe the user",
+                "summary": "send friend request",
                 "parameters": [
                     {
-                        "description": "user to observe",
+                        "description": "user to friend",
                         "name": "user",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/me.observeRequest"
+                            "$ref": "#/definitions/me.friendRequest"
                         }
                     }
                 ],
@@ -191,22 +191,22 @@
                 }
             },
             "delete": {
-                "description": "stop observing the user, if user is not observed, nothing happen",
+                "description": "remove friend and clear pending requests between users",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "me"
                 ],
-                "summary": "unobserve the user",
+                "summary": "remove friend",
                 "parameters": [
                     {
-                        "description": "user to unobserve",
+                        "description": "user to unfriend",
                         "name": "user",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/me.observeRequest"
+                            "$ref": "#/definitions/me.friendRequest"
                         }
                     }
                 ],
@@ -222,6 +222,242 @@
                     },
                     "404": {
                         "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/friend/accept": {
+            "post": {
+                "description": "accept a pending friend request from another user",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "accept friend request",
+                "parameters": [
+                    {
+                        "description": "user to accept",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/me.friendRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "404": {
+                        "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/friend/reject": {
+            "post": {
+                "description": "reject a pending friend request from another user",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "reject friend request",
+                "parameters": [
+                    {
+                        "description": "user to reject",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/me.friendRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "404": {
+                        "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/sharing/stop": {
+            "post": {
+                "description": "stop sharing location with another user",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "stop sharing location",
+                "parameters": [
+                    {
+                        "description": "user to stop sharing with",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/me.friendRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/sharing/resume": {
+            "post": {
+                "description": "resume sharing location with another user",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "resume sharing location",
+                "parameters": [
+                    {
+                        "description": "user to resume sharing with",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/me.friendRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/location": {
+            "put": {
+                "description": "update logged user location",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "update location",
+                "parameters": [
+                    {
+                        "description": "update location object",
+                        "name": "location",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/me.updateLocationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "nullify logged user location",
+                "tags": [
+                    "me"
+                ],
+                "summary": "wipe location",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "invalid token",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -256,46 +492,6 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/me.updateStatusRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "invalid request",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    },
-                    "500": {
-                        "description": "internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    }
-                }
-            }
-        },
-        "/me/updateLocation": {
-            "put": {
-                "description": "update logged user location",
-                "consumes": [
-                    "application/json"
-                ],
-                "tags": [
-                    "me"
-                ],
-                "summary": "update location",
-                "parameters": [
-                    {
-                        "description": "update location object",
-                        "name": "location",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/me.updateLocationRequest"
                         }
                     }
                 ],

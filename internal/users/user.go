@@ -28,6 +28,8 @@ type User struct {
 
 	// ObservedUsers list of IDs user subscribe
 	SubscribedUsers []id.ID `bson:"subscribed_users"`
+	// PausedUsers list of IDs user has paused sharing location with
+	PausedUsers []id.ID `bson:"paused_users"`
 }
 
 func (u User) SubscribeUser(id id.ID) bool {
@@ -52,6 +54,8 @@ type Adapter interface {
 	AcceptFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
 	RejectFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
 	UnfriendUser(ctx context.Context, user id.ID, userToUnfriend id.ID) error
+	StopSharing(ctx context.Context, user id.ID, userToPause id.ID) error
+	ResumeSharing(ctx context.Context, user id.ID, userToUnpause id.ID) error
 }
 
 var ErrUserNotExists = mongo.ErrNoDocuments
@@ -292,6 +296,38 @@ func (m *mongoUserAdapter) RejectFriendRequest(
 	requester id.ID,
 ) error {
 	return m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, requester)
+}
+
+func (m *mongoUserAdapter) StopSharing(ctx context.Context, userID id.ID, userToPause id.ID) error {
+	filter := withUserId(userID)
+	update := bson.M{
+		"$addToSet": bson.M{
+			"paused_users": userToPause,
+		},
+	}
+
+	_, err := m.coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("stop sharing location: %w", err)
+	}
+
+	return nil
+}
+
+func (m *mongoUserAdapter) ResumeSharing(ctx context.Context, userID id.ID, userToUnpause id.ID) error {
+	filter := withUserId(userID)
+	update := bson.M{
+		"$pull": bson.M{
+			"paused_users": userToUnpause,
+		},
+	}
+
+	_, err := m.coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("start sharing location: %w", err)
+	}
+
+	return nil
 }
 
 var _ Adapter = (*mongoUserAdapter)(nil)
