@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
 	"whereiseveryone/pkg/pointers"
@@ -28,12 +29,29 @@ type User struct {
 
 	// ObservedUsers list of IDs user subscribe
 	SubscribedUsers []id.ID `bson:"subscribed_users"`
+	// FriendSince maps subscribed user IDs to the friendship creation time.
+	FriendSince map[string]time.Time `bson:"friend_since,omitempty"`
 	// PausedUsers list of IDs user has paused sharing location with
 	PausedUsers []id.ID `bson:"paused_users"`
 }
 
 func (u User) SubscribeUser(id id.ID) bool {
 	return slices.Contains(u.SubscribedUsers, id)
+}
+
+func (u User) FriendSinceFor(friendID id.ID) *time.Time {
+	if u.FriendSince == nil {
+		return nil
+	}
+	key := friendID.Hex()
+	if t, ok := u.FriendSince[key]; ok {
+		return &t
+	}
+	return nil
+}
+
+func friendSinceKey(friendID id.ID) string {
+	return "friend_since." + friendID.Hex()
 }
 
 type Adapter interface {
@@ -50,6 +68,7 @@ type Adapter interface {
 
 	UpdateStatus(ctx context.Context, user id.ID, newStatus string) error
 	AddFriend(ctx context.Context, user id.ID, userToObserve id.ID) error
+	SetFriendSince(ctx context.Context, user id.ID, friendID id.ID, friendSince time.Time) error
 	SendFriendRequest(ctx context.Context, from id.ID, to id.ID) error
 	AcceptFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
 	RejectFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
@@ -68,6 +87,7 @@ type mongoUserAdapter struct {
 
 	coll   *mongo.Collection
 	logger logger.Logger
+	timer  timer.Timer
 }
 
 func NewMongoAdapter(
@@ -86,6 +106,7 @@ func NewMongoAdapter(
 		pendingFriendRequestAdapter: pendingFriendRequestAdapter,
 		coll:                        coll,
 		logger:                      logger,
+		timer:                       timer,
 	}
 }
 
@@ -225,6 +246,27 @@ func (m *mongoUserAdapter) AddFriend(
 	return nil
 }
 
+func (m *mongoUserAdapter) SetFriendSince(
+	ctx context.Context,
+	user id.ID,
+	friendID id.ID,
+	friendSince time.Time,
+) error {
+	filter := withUserId(user)
+	update := bson.M{
+		"$set": bson.M{
+			friendSinceKey(friendID): friendSince,
+		},
+	}
+
+	_, err := m.coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("set friend since: %w", err)
+	}
+
+	return nil
+}
+
 func (m *mongoUserAdapter) SendFriendRequest(
 	ctx context.Context,
 	from id.ID,
@@ -245,6 +287,9 @@ func (m *mongoUserAdapter) UnfriendUser(
 			"$pull": bson.M{
 				"subscribed_users": userToUnfriend,
 			},
+			"$unset": bson.M{
+				friendSinceKey(userToUnfriend): "",
+			},
 		},
 	)
 	if err != nil {
@@ -257,6 +302,9 @@ func (m *mongoUserAdapter) UnfriendUser(
 		bson.M{
 			"$pull": bson.M{
 				"subscribed_users": user,
+			},
+			"$unset": bson.M{
+				friendSinceKey(user): "",
 			},
 		},
 	)
@@ -277,12 +325,24 @@ func (m *mongoUserAdapter) AcceptFriendRequest(
 		return err
 	}
 
+	friendSince := m.timer.Now()
+
 	err = m.AddFriend(ctx, user, requester)
 	if err != nil {
 		return err
 	}
 
+	err = m.SetFriendSince(ctx, user, requester, friendSince)
+	if err != nil {
+		return err
+	}
+
 	err = m.AddFriend(ctx, requester, user)
+	if err != nil {
+		return err
+	}
+
+	err = m.SetFriendSince(ctx, requester, user, friendSince)
 	if err != nil {
 		return err
 	}

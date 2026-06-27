@@ -17,10 +17,20 @@ type updateStatusRequest struct {
 type getFriendsResponse []friendDetails
 
 type friendDetails struct {
-	Username string           `json:"username"`
-	Status   string           `json:"status"`
-	State    friendState      `json:"state"`
-	Location *locationDetails `json:"location,omitempty"`
+	Username    string           `json:"username"`
+	Status      string           `json:"status"`
+	State       friendState      `json:"state"`
+	Location    *locationDetails `json:"location,omitempty"`
+	FriendSince *time.Time       `json:"friend_since"`
+}
+
+func newFriendDetails(username, status string, state friendState, friendSince *time.Time) friendDetails {
+	return friendDetails{
+		Username:    username,
+		Status:      status,
+		State:       state,
+		FriendSince: friendSince,
+	}
 }
 
 type locationDetails struct {
@@ -39,5 +49,11 @@ type updateLocationRequest struct {
 }
 
 type friendRequest struct {
+	Username string `json:"username"`
+}
+
+type getPausedResponse []pausedFriendDetails
+
+type pausedFriendDetails struct {
 	Username string `json:"username"`
 }

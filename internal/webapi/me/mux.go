@@ -32,6 +32,7 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.POST("/friend/reject", m.rejectFriend)
 	g.POST("/sharing/stop", m.stopSharing)
 	g.POST("/sharing/resume", m.resumeSharing)
+	g.GET("/sharing", m.getPaused)
 }
 
 // updateStatus
@@ -102,9 +103,10 @@ func (m *mux) getFriends(c echo.Context) error {
 
 	for _, u := range friends {
 		friend := friendDetails{
-			Username: u.Auth.Username,
-			Status:   u.Status,
-			State:    friendStateAccepted,
+			Username:    u.Auth.Username,
+			Status:      u.Status,
+			State:       friendStateAccepted,
+			FriendSince: user.FriendSinceFor(u.ID),
 		}
 
 		if u.Location != nil && !slices.Contains(u.PausedUsers, user.ID) {
@@ -136,11 +138,12 @@ func (m *mux) getFriends(c echo.Context) error {
 	}
 
 	for _, u := range incomingUsers {
-		result = append(result, friendDetails{
-			Username: u.Auth.Username,
-			Status:   u.Status,
-			State:    friendStatePendingIncoming,
-		})
+		result = append(result, newFriendDetails(
+			u.Auth.Username,
+			u.Status,
+			friendStatePendingIncoming,
+			nil,
+		))
 	}
 
 	// Outgoing pending requests
@@ -158,11 +161,12 @@ func (m *mux) getFriends(c echo.Context) error {
 	}
 
 	for _, u := range outgoingUsers {
-		result = append(result, friendDetails{
-			Username: u.Auth.Username,
-			Status:   u.Status,
-			State:    friendStatePendingOutgoing,
-		})
+		result = append(result, newFriendDetails(
+			u.Auth.Username,
+			u.Status,
+			friendStatePendingOutgoing,
+			nil,
+		))
 	}
 
 	return c.JSON(http.StatusOK, result)
@@ -370,7 +374,18 @@ func (m *mux) acceptFriend(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	currentUser, err := m.userAdapter.GetUser(ctx, request.UserID())
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	friendSinceTime := currentUser.FriendSinceFor(requester.ID)
+	return c.JSON(http.StatusOK, friendDetails{
+		Username:    requester.Auth.Username,
+		Status:      requester.Status,
+		State:       friendStateAccepted,
+		FriendSince: friendSinceTime,
+	})
 }
 
 // rejectFriend
@@ -501,4 +516,48 @@ func (m *mux) resumeSharing(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+// getPaused
+//
+// @summary get paused friends details
+// @description returns list of friends with whom location sharing is paused
+// @tags me
+// @produce json
+// @success 200 {object} getPausedResponse
+// @failure 401 {object} jsonerr.JSONError "invalid token"
+// @failure 500 {object} jsonerr.JSONError "internal server error"
+// @router /me/friends [GET]
+func (m *mux) getPaused(c echo.Context) error {
+	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
+	if bindErr != nil {
+		return bindErr.Echo(c)
+	}
+	defer request.Cancel()
+
+	ctx := request.Context()
+
+	user, err := m.userAdapter.GetUser(ctx, request.UserID())
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	result := make(getPausedResponse, 0)
+
+	pausedUsers, err := m.userAdapter.GetUsers(
+		ctx,
+		user.PausedUsers,
+	)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+
+	for _, f := range pausedUsers {
+		pausedFriend := pausedFriendDetails{
+			Username: f.Auth.Username,
+		}
+		result = append(result, pausedFriend)
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
