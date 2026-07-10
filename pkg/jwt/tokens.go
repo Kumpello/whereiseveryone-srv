@@ -40,8 +40,12 @@ func (j JWT) GenerateTokens(username string, id id.ID) (string, string, error) {
 		},
 	}
 
-	refresh := jwt.StandardClaims{
-		ExpiresAt: j.timer.Now().Add(j.refreshValidity).Unix(),
+	refresh := SignedToken{
+		UserName: username,
+		ID:       id.Hex(),
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: j.timer.Now().Add(j.refreshValidity).Unix(),
+		},
 	}
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(j.secret)

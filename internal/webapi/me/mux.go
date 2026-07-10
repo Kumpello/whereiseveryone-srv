@@ -527,7 +527,7 @@ func (m *mux) resumeSharing(c echo.Context) error {
 // @success 200 {object} getPausedResponse
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
-// @router /me/friends [GET]
+// @router /me/sharing [GET]
 func (m *mux) getPaused(c echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
 	if bindErr != nil {
