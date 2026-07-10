@@ -84,7 +84,7 @@ func BindRequest[T any](
 		jwtToken, err := webapi.GetJWTToken(c)
 		if err != nil {
 			c.Logger().Errorf("Failed to get JWT token: %v", err)
-			return result, jsonerr.EchoForbiddenError()
+			return result, webapi.JWTErrorToJSONError(err)
 		}
 		requesterID, err := id.FromString(jwtToken.ID)
 		if err != nil {

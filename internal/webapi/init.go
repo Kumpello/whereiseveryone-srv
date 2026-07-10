@@ -3,10 +3,12 @@ package webapi
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/labstack/echo/v4/middleware"
 
+	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/jwt"
 	"whereiseveryone/pkg/logger"
 
@@ -34,6 +36,22 @@ func GetJWTToken(c echo.Context) (jwt.SignedToken, error) {
 	}
 
 	return jwtToken, nil
+}
+
+func JWTErrorToStatus(err error) int {
+	if errors.Is(err, jwt.ErrTokenExpired) {
+		return http.StatusUnauthorized
+	}
+
+	return http.StatusForbidden
+}
+
+func JWTErrorToJSONError(err error) *jsonerr.JSONError {
+	if errors.Is(err, jwt.ErrTokenExpired) {
+		return jsonerr.EchoExpiredTokenError()
+	}
+
+	return jsonerr.EchoForbiddenError()
 }
 
 type EchoRouters struct {
@@ -67,11 +85,12 @@ func NewEcho(
 
 			v, err := jwtInstance.ValidateToken(strings.TrimPrefix(jwtToken, "Bearer "))
 			if err != nil {
-				if errors.Is(err, jwt.ErrTokenExpired) {
-					return c.String(401, "token expired")
-				} else {
-					return c.String(403, fmt.Sprintf("invalid token: %s", err.Error()))
+				status := JWTErrorToStatus(err)
+				if status == http.StatusUnauthorized {
+					return c.String(status, "token expired")
 				}
+
+				return c.String(status, fmt.Sprintf("invalid token: %s", err.Error()))
 			}
 			c.Set("user", v)
 
