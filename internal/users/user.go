@@ -79,6 +79,7 @@ type Adapter interface {
 
 var ErrUserNotExists = mongo.ErrNoDocuments
 var ErrUserNameAlreadyExists = errors.New("username is already in use")
+var ErrFriendRequestNotExists = errors.New("friend request does not exist")
 
 type mongoUserAdapter struct {
 	locationAdapter
@@ -280,6 +281,13 @@ func (m *mongoUserAdapter) UnfriendUser(
 	user id.ID,
 	userToUnfriend id.ID,
 ) error {
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, userToUnfriend); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+		return err
+	}
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, userToUnfriend, user); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+		return err
+	}
+
 	_, err := m.coll.UpdateOne(
 		ctx,
 		withUserId(user),
@@ -355,7 +363,14 @@ func (m *mongoUserAdapter) RejectFriendRequest(
 	user id.ID,
 	requester id.ID,
 ) error {
-	return m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, requester)
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, requester); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+		return err
+	}
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, requester, user); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+		return err
+	}
+
+	return nil
 }
 
 func (m *mongoUserAdapter) StopSharing(ctx context.Context, userID id.ID, userToPause id.ID) error {

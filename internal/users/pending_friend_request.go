@@ -150,9 +150,12 @@ func (m mongoPendingFriendRequestAdapter) DeleteFriendRequest(
 		"to":   user,
 	}
 
-	_, err := m.coll.DeleteOne(ctx, filter)
+	res, err := m.coll.DeleteOne(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("remove pending friend request: %w", err)
+	}
+	if res.DeletedCount == 0 {
+		return ErrFriendRequestNotExists
 	}
 
 	return nil

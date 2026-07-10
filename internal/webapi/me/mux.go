@@ -371,6 +371,9 @@ func (m *mux) acceptFriend(c echo.Context) error {
 		requester.ID,
 	)
 	if err != nil {
+		if errors.Is(err, users.ErrFriendRequestNotExists) {
+			return jsonerr.EchoNotFoundError(err).Echo(c)
+		}
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
@@ -428,6 +431,9 @@ func (m *mux) rejectFriend(c echo.Context) error {
 		requester.ID,
 	)
 	if err != nil {
+		if errors.Is(err, users.ErrFriendRequestNotExists) {
+			return jsonerr.EchoNotFoundError(err).Echo(c)
+		}
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
