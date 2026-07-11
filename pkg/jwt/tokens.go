@@ -8,7 +8,7 @@ import (
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/timer"
 
-	"github.com/golang-jwt/jwt"
+	jwtgo "github.com/golang-jwt/jwt"
 )
 
 type JWT struct {
@@ -26,7 +26,7 @@ type SignedToken struct {
 	UserName string
 	ID       string
 
-	jwt.StandardClaims
+	jwtgo.StandardClaims
 }
 
 var ErrTokenExpired = errors.New("token is expired")
@@ -35,7 +35,7 @@ func (j JWT) GenerateTokens(username string, id id.ID) (string, string, error) {
 	claims := SignedToken{
 		UserName: username,
 		ID:       id.Hex(),
-		StandardClaims: jwt.StandardClaims{
+		StandardClaims: jwtgo.StandardClaims{
 			ExpiresAt: j.timer.Now().Add(j.validity).Unix(),
 		},
 	}
@@ -43,16 +43,16 @@ func (j JWT) GenerateTokens(username string, id id.ID) (string, string, error) {
 	refresh := SignedToken{
 		UserName: username,
 		ID:       id.Hex(),
-		StandardClaims: jwt.StandardClaims{
+		StandardClaims: jwtgo.StandardClaims{
 			ExpiresAt: j.timer.Now().Add(j.refreshValidity).Unix(),
 		},
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(j.secret)
+	token, err := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims).SignedString(j.secret)
 	if err != nil {
 		return "", "", fmt.Errorf("create token: %w", err)
 	}
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refresh).SignedString(j.secret)
+	refreshToken, err := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, refresh).SignedString(j.secret)
 	if err != nil {
 		return "", "", fmt.Errorf("create refresh token: %w", err)
 	}
@@ -61,14 +61,18 @@ func (j JWT) GenerateTokens(username string, id id.ID) (string, string, error) {
 }
 
 func (j JWT) ValidateToken(signed string) (SignedToken, error) {
-	token, err := jwt.ParseWithClaims(
+	token, err := jwtgo.ParseWithClaims(
 		signed,
 		&SignedToken{},
-		func(token *jwt.Token) (any, error) {
+		func(token *jwtgo.Token) (any, error) {
 			return j.secret, nil
 		})
 
 	if err != nil {
+		var validationErr *jwtgo.ValidationError
+		if errors.As(err, &validationErr) && validationErr.Errors&jwtgo.ValidationErrorExpired != 0 {
+			return SignedToken{}, ErrTokenExpired
+		}
 		return SignedToken{}, fmt.Errorf("parse token: %w", err)
 	}
 
