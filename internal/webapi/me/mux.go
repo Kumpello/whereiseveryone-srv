@@ -106,7 +106,7 @@ func (m *mux) getFriends(c echo.Context) error {
 			Username:    u.Auth.Username,
 			Status:      u.Status,
 			State:       friendStateAccepted,
-			FriendSince: user.FriendSinceFor(u.ID),
+			FriendSince: newTimestampPtr(user.FriendSinceFor(u.ID)),
 		}
 
 		if u.Location != nil && !slices.Contains(u.PausedUsers, user.ID) {
@@ -116,7 +116,7 @@ func (m *mux) getFriends(c echo.Context) error {
 				Altitude:   u.Location.Altitude,
 				Bearing:    u.Location.Bearing,
 				Accuracy:   u.Location.Accuracy,
-				LastUpdate: u.Location.LastUpdate,
+				LastUpdate: newTimestamp(u.Location.LastUpdate),
 			}
 		}
 
@@ -198,7 +198,7 @@ func (m *mux) updateLocation(c echo.Context) error {
 		Altitude:   newLoc.Altitude,
 		Bearing:    newLoc.Bearing,
 		Accuracy:   newLoc.Accuracy,
-		LastUpdate: newLoc.LastUpdate,
+		LastUpdate: newLoc.LastUpdate.Time(),
 	})
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
@@ -387,7 +387,7 @@ func (m *mux) acceptFriend(c echo.Context) error {
 		Username:    requester.Auth.Username,
 		Status:      requester.Status,
 		State:       friendStateAccepted,
-		FriendSince: friendSinceTime,
+		FriendSince: newTimestampPtr(friendSinceTime),
 	})
 }
 

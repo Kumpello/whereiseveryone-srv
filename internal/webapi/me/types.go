@@ -1,6 +1,47 @@
 package me
 
-import "time"
+import (
+	"encoding/json"
+	"strconv"
+	"time"
+)
+
+type timestamp time.Time
+
+func newTimestamp(t time.Time) timestamp {
+	return timestamp(t.UTC())
+}
+
+func newTimestampPtr(t *time.Time) *timestamp {
+	if t == nil {
+		return nil
+	}
+
+	value := newTimestamp(*t)
+	return &value
+}
+
+func (t timestamp) Time() time.Time {
+	return time.Time(t)
+}
+
+func (t timestamp) Equal(u time.Time) bool {
+	return t.Time().Equal(u)
+}
+
+func (t timestamp) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.FormatInt(t.Time().UnixMilli(), 10)), nil
+}
+
+func (t *timestamp) UnmarshalJSON(data []byte) error {
+	var value int64
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+
+	*t = newTimestamp(time.UnixMilli(value))
+	return nil
+}
 
 type friendState string
 
@@ -21,7 +62,7 @@ type friendDetails struct {
 	Status      string           `json:"status"`
 	State       friendState      `json:"state"`
 	Location    *locationDetails `json:"location,omitempty"`
-	FriendSince *time.Time       `json:"friend_since"`
+	FriendSince *timestamp       `json:"friend_since"`
 }
 
 func newFriendDetails(username, status string, state friendState, friendSince *time.Time) friendDetails {
@@ -29,7 +70,7 @@ func newFriendDetails(username, status string, state friendState, friendSince *t
 		Username:    username,
 		Status:      status,
 		State:       state,
-		FriendSince: friendSince,
+		FriendSince: newTimestampPtr(friendSince),
 	}
 }
 
@@ -41,7 +82,7 @@ type locationDetails struct {
 	Accuracy  float64 `json:"accuracy,omitempty"`
 
 	// LastUpdate in UTC time
-	LastUpdate time.Time `json:"last_update"`
+	LastUpdate timestamp `json:"last_update"`
 }
 
 type updateLocationRequest struct {
