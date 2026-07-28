@@ -5,6 +5,8 @@ type signUpRequest struct {
 	Username string `json:"username" validate:"required"`
 	// Password user password, min 8 characters
 	Password string `json:"password" validate:"required,min=8"`
+	// DeviceToken identifies the client device for single-device auth
+	DeviceToken string `json:"device_token" validate:"omitempty"`
 }
 
 type logInRequest struct {
@@ -12,6 +14,8 @@ type logInRequest struct {
 	Username string `json:"username" validate:"required"`
 	// Password user password
 	Password string `json:"password" validate:"required"`
+	// DeviceToken identifies the client device for single-device auth
+	DeviceToken string `json:"device_token" validate:"omitempty"`
 }
 
 type authResponse struct {
@@ -25,4 +29,6 @@ type authResponse struct {
 
 type refreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
+	// DeviceToken identifies the client device requesting refresh
+	DeviceToken string `json:"device_token" validate:"omitempty"`
 }

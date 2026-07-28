@@ -3,12 +3,13 @@ package users
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"time"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
 	"whereiseveryone/pkg/timer"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Auth struct {
@@ -20,6 +21,8 @@ type Auth struct {
 	Token string `bson:"token"`
 	// RefreshToken is jwt-refresh-token
 	RefreshToken string `bson:"refresh_token"`
+	// DeviceToken identifies client device (for single-device/session enforcement)
+	DeviceToken string `bson:"device_token,omitempty"`
 	// CreatedAt tells when the user was created
 	CreatedAt time.Time `bson:"created_at"`
 	// UpdatedAt tells when the last update was done
@@ -28,7 +31,7 @@ type Auth struct {
 
 type authAdapter interface {
 	// UpdateTokens update user tokens (if they are not nil)
-	UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken *string) error
+	UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken, deviceToken *string) error
 }
 
 type mongoAuthAdapter struct {
@@ -37,13 +40,16 @@ type mongoAuthAdapter struct {
 	logger logger.Logger
 }
 
-func (m mongoAuthAdapter) UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken *string) error {
+func (m mongoAuthAdapter) UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken, deviceToken *string) error {
 	tokens := bson.D{}
 	if token != nil {
 		tokens = append(tokens, bson.E{Key: "auth.token", Value: *token})
 	}
 	if refreshedToken != nil {
 		tokens = append(tokens, bson.E{Key: "auth.refresh_token", Value: *refreshedToken})
+	}
+	if deviceToken != nil {
+		tokens = append(tokens, bson.E{Key: "auth.device_token", Value: *deviceToken})
 	}
 	tokens = append(tokens, bson.E{Key: "auth.updated_at", Value: m.timer.Now()})
 

@@ -23,6 +23,8 @@ type Location struct {
 	Bearing float64 `bson:"bearing,omitempty"`
 	// Accuracy
 	Accuracy float64 `bson:"accuracy,omitempty"`
+	// Speed
+	Speed float64 `bson:"speed,omitempty"`
 	// LastUpdate
 	LastUpdate time.Time `bson:"last_update"`
 }

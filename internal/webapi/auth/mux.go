@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -32,6 +33,25 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.POST("/signup", m.signUp)
 	g.POST("/login", m.logIn)
 	g.POST("/refresh", m.refreshToken)
+}
+
+func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, incomingDeviceToken string) (bool, error) {
+	if incomingDeviceToken == "" || user.Auth.DeviceToken == "" || user.Auth.DeviceToken == incomingDeviceToken {
+		return false, nil
+	}
+
+	clearDeviceToken := ""
+	token, refresh, err := m.jwt.GenerateTokens(user.Auth.Username, user.ID)
+	if err != nil {
+		return false, err
+	}
+
+	err = m.userAdapter.UpdateTokens(ctx, user.ID, &token, &refresh, &clearDeviceToken)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // signUp
@@ -90,7 +110,12 @@ func (m *mux) signUp(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh); err != nil {
+	var deviceTokenPtr *string
+	if request.DeviceToken != "" {
+		deviceTokenPtr = &request.DeviceToken
+	}
+
+	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, deviceTokenPtr); err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
@@ -144,7 +169,18 @@ func (m *mux) logIn(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh); err != nil {
+	var deviceTokenPtr *string
+	if request.DeviceToken != "" {
+		deviceTokenPtr = &request.DeviceToken
+	}
+
+	if conflicted, err := m.handleDeviceTokenConflict(reqCtx, u, request.DeviceToken); err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	} else if conflicted {
+		return c.JSON(http.StatusConflict, map[string]string{"message": "device token conflict"})
+	}
+
+	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, deviceTokenPtr); err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
@@ -215,6 +251,19 @@ func (m *mux) refreshToken(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
+	// Validate provided refresh token matches stored refresh token
+	if u.Auth.RefreshToken != request.RefreshToken {
+		return jsonerr.EchoForbiddenError().Echo(c)
+	}
+
+	if conflicted, err := m.handleDeviceTokenConflict(reqCtx, u, request.DeviceToken); err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	} else if conflicted {
+		return c.JSON(http.StatusConflict, map[string]string{
+			"message": "device token conflict",
+		})
+	}
+
 	// Rotate tokens
 	token, refresh, err := m.jwt.GenerateTokens(
 		u.Auth.Username,
@@ -229,6 +278,7 @@ func (m *mux) refreshToken(c echo.Context) error {
 		u.ID,
 		&token,
 		&refresh,
+		nil,
 	)
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)

@@ -80,6 +80,7 @@ type locationDetails struct {
 	Altitude  float64 `json:"altitude,omitempty"`
 	Bearing   float64 `json:"bearing,omitempty"`
 	Accuracy  float64 `json:"accuracy,omitempty"`
+	Speed     float64 `json:"speed,omitempty"`
 
 	// LastUpdate in UTC time
 	LastUpdate timestamp `json:"last_update"`
