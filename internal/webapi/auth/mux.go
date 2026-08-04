@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"runtime"
 	"time"
+
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/crypto"
@@ -15,10 +17,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const authRequestTimeout = 15 * time.Second
+
 type mux struct {
 	userAdapter users.Adapter
 	timer       timer.Timer
 	jwt         *jwt.JWT
+
+	passwordHashCost int
+	passwordOps      chan struct{}
 }
 
 func NewMux(
@@ -26,7 +33,33 @@ func NewMux(
 	timer timer.Timer,
 	jwt *jwt.JWT,
 ) *mux {
-	return &mux{userAdapter, timer, jwt}
+	passwordOpsLimit := runtime.GOMAXPROCS(0)
+	if passwordOpsLimit < 1 {
+		passwordOpsLimit = 1
+	}
+
+	return &mux{
+		userAdapter:      userAdapter,
+		timer:            timer,
+		jwt:              jwt,
+		passwordHashCost: crypto.DefaultPasswordHashCost,
+		passwordOps:      make(chan struct{}, passwordOpsLimit),
+	}
+}
+
+func (m *mux) SetPasswordHashCost(cost int) {
+	m.passwordHashCost = cost
+}
+
+func (m *mux) acquirePasswordSlot(ctx context.Context) (func(), error) {
+	select {
+	case m.passwordOps <- struct{}{}:
+		return func() {
+			<-m.passwordOps
+		}, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
@@ -68,7 +101,7 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/signup [POST]
 func (m *mux) signUp(c echo.Context) error {
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), time.Duration(60)*time.Second)
+	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
 	defer cancel()
 
 	var request signUpRequest
@@ -79,7 +112,12 @@ func (m *mux) signUp(c echo.Context) error {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
 	}
 
-	encPass, err := crypto.HashPassword(request.Password)
+	releasePasswordSlot, err := m.acquirePasswordSlot(reqCtx)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+	encPass, err := crypto.HashPasswordWithCost(request.Password, m.passwordHashCost)
+	releasePasswordSlot()
 	if err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
 	}
@@ -141,7 +179,7 @@ func (m *mux) signUp(c echo.Context) error {
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/login [POST]
 func (m *mux) logIn(c echo.Context) error {
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), time.Duration(60)*time.Second)
+	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
 	defer cancel()
 
 	var request logInRequest
@@ -160,7 +198,13 @@ func (m *mux) logIn(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	if err = crypto.VerifyPassword(u.Auth.Password, request.Password); err != nil {
+	releasePasswordSlot, err := m.acquirePasswordSlot(reqCtx)
+	if err != nil {
+		return jsonerr.EchoInternalError(err).Echo(c)
+	}
+	err = crypto.VerifyPassword(u.Auth.Password, request.Password)
+	releasePasswordSlot()
+	if err != nil {
 		return jsonerr.EchoForbiddenError().Echo(c)
 	}
 
@@ -209,7 +253,7 @@ func (m *mux) logIn(c echo.Context) error {
 func (m *mux) refreshToken(c echo.Context) error {
 	reqCtx, cancel := context.WithTimeout(
 		c.Request().Context(),
-		60*time.Second,
+		authRequestTimeout,
 	)
 	defer cancel()
 

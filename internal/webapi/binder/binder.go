@@ -12,6 +12,8 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const requestTimeout = 15 * time.Second
+
 // BaseContext is interface over Context without generic type
 // Allows to use Context without generic type
 type BaseContext interface {
@@ -74,13 +76,11 @@ func BindRequest[T any](
 	var t T
 
 	// Obtain context and cancel
-	// TODO: For debug increase timeout
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), time.Duration(5)*time.Minute)
+	reqCtx, cancel := context.WithTimeout(c.Request().Context(), requestTimeout)
 	result.ctx = reqCtx
 	result.cancel = cancel
 
 	if requireAuth {
-		c.Logger().Debugf("Bind request with auth")
 		jwtToken, err := webapi.GetJWTToken(c)
 		if err != nil {
 			c.Logger().Errorf("Failed to get JWT token: %v", err)

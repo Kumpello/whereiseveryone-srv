@@ -24,6 +24,7 @@ type pendingFriendRequestAdapter interface {
 	GetPendingOutgoingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
 	SendFriendRequest(ctx context.Context, from id.ID, to id.ID) error
 	DeleteFriendRequest(ctx context.Context, user id.ID, requester id.ID) error
+	DeleteFriendRequestsBetween(ctx context.Context, first id.ID, second id.ID) error
 }
 
 type mongoPendingFriendRequestAdapter struct {
@@ -70,19 +71,26 @@ func (m mongoPendingFriendRequestAdapter) GetPendingIncomingFriendRequestUserIDs
 		"to": user,
 	}
 
-	c, err := m.coll.Find(ctx, filter)
+	opts := options.Find().SetProjection(bson.M{
+		"_id":  0,
+		"from": 1,
+	})
+	c, err := m.coll.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("find incoming pending friend requests: %w", err)
 	}
+	defer c.Close(ctx)
 
-	var requests []PendingFriendRequest
-	if err := c.All(ctx, &requests); err != nil {
-		return nil, fmt.Errorf("decode incoming pending friend requests: %w", err)
-	}
-
-	userIDs := make([]id.ID, 0, len(requests))
-	for _, request := range requests {
+	userIDs := make([]id.ID, 0)
+	for c.Next(ctx) {
+		var request PendingFriendRequest
+		if err := c.Decode(&request); err != nil {
+			return nil, fmt.Errorf("decode incoming pending friend requests: %w", err)
+		}
 		userIDs = append(userIDs, request.From)
+	}
+	if err := c.Err(); err != nil {
+		return nil, fmt.Errorf("read incoming pending friend requests: %w", err)
 	}
 
 	return userIDs, nil
@@ -96,19 +104,26 @@ func (m mongoPendingFriendRequestAdapter) GetPendingOutgoingFriendRequestUserIDs
 		"from": user,
 	}
 
-	c, err := m.coll.Find(ctx, filter)
+	opts := options.Find().SetProjection(bson.M{
+		"_id": 0,
+		"to":  1,
+	})
+	c, err := m.coll.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("find outgoing pending friend requests: %w", err)
 	}
+	defer c.Close(ctx)
 
-	var requests []PendingFriendRequest
-	if err := c.All(ctx, &requests); err != nil {
-		return nil, fmt.Errorf("decode outgoing pending friend requests: %w", err)
-	}
-
-	userIDs := make([]id.ID, 0, len(requests))
-	for _, request := range requests {
+	userIDs := make([]id.ID, 0)
+	for c.Next(ctx) {
+		var request PendingFriendRequest
+		if err := c.Decode(&request); err != nil {
+			return nil, fmt.Errorf("decode outgoing pending friend requests: %w", err)
+		}
 		userIDs = append(userIDs, request.To)
+	}
+	if err := c.Err(); err != nil {
+		return nil, fmt.Errorf("read outgoing pending friend requests: %w", err)
 	}
 
 	return userIDs, nil
@@ -156,6 +171,31 @@ func (m mongoPendingFriendRequestAdapter) DeleteFriendRequest(
 	}
 	if res.DeletedCount == 0 {
 		return ErrFriendRequestNotExists
+	}
+
+	return nil
+}
+
+func (m mongoPendingFriendRequestAdapter) DeleteFriendRequestsBetween(
+	ctx context.Context,
+	first id.ID,
+	second id.ID,
+) error {
+	filter := bson.M{
+		"$or": []bson.M{
+			{
+				"from": first,
+				"to":   second,
+			},
+			{
+				"from": second,
+				"to":   first,
+			},
+		},
+	}
+
+	if _, err := m.coll.DeleteMany(ctx, filter); err != nil {
+		return fmt.Errorf("remove pending friend requests between users: %w", err)
 	}
 
 	return nil

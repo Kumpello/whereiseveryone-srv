@@ -8,6 +8,9 @@ It's a standard go app. You can run it using `go run` etc.
 
 App uses json-config. The config MUST be a JSON with **only string** entries.
 As a default `./.env/local.json` is used. You can override it with a flag `--config=$filePath`
+Optional performance-related config:
+
+* `app.bcryptCost` - bcrypt work factor for new password hashes. Defaults to `14`.
 
 ## Docker - srv
 
@@ -54,6 +57,7 @@ docker run \
 ```
 
 To see list of available commands just run the client without any command.
+The server also verifies Mongo indexes during startup; the CLI command remains useful for explicit migration/preflight jobs.
 
 # Authorization
 

@@ -6,8 +6,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const DefaultPasswordHashCost = 14
+
 func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return HashPasswordWithCost(password, DefaultPasswordHashCost)
+}
+
+func HashPasswordWithCost(password string, cost int) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
 		return "", fmt.Errorf("encrypt the password: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4/middleware"
 
@@ -111,19 +112,28 @@ func NewEcho(
 		return c.JSON(200, "ok")
 	})
 
-	// TODO: Use logrus for logging instead of this middleware
-	// 		 Config to log this only for debug
-	//		 And disable it on production
-	e.Use(middleware.Logger())
-	e.Use(middleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-	}))
-
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			logger.MakeEchoLogEntry(log, c).Info("incoming request")
-			return next(c)
-		}
-	})
+	if debug {
+		e.Use(middleware.RequestLogger())
+	} else {
+		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+			return func(c echo.Context) error {
+				start := time.Now()
+				err := next(c)
+				if err != nil {
+					c.Error(err)
+				}
+				entry := logger.MakeEchoLogEntry(log, c).
+					WithField("status", c.Response().Status).
+					WithField("latency", time.Since(start).String())
+				if err != nil {
+					entry.WithError(err).Warn("request failed")
+				} else {
+					entry.Info("request completed")
+				}
+				return nil
+			}
+		})
+	}
 
 	return e
 }

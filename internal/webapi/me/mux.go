@@ -90,16 +90,54 @@ func (m *mux) getFriends(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	result := make(getFriendsResponse, 0)
-
-	// Accepted friends
-	friends, err := m.userAdapter.GetUsers(
-		ctx,
-		user.SubscribedUsers,
-	)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
+	type friendsLoad struct {
+		friends       []users.User
+		incomingUsers []users.User
+		outgoingUsers []users.User
+		err           error
 	}
+
+	loads := make(chan friendsLoad, 3)
+
+	go func() {
+		friends, err := m.userAdapter.GetUsers(ctx, user.SubscribedUsers)
+		loads <- friendsLoad{friends: friends, err: err}
+	}()
+
+	go func() {
+		incomingUserIDs, err := m.userAdapter.GetPendingIncomingFriendRequestUserIDs(ctx, user.ID)
+		if err != nil {
+			loads <- friendsLoad{err: err}
+			return
+		}
+		incomingUsers, err := m.userAdapter.GetUsers(ctx, incomingUserIDs)
+		loads <- friendsLoad{incomingUsers: incomingUsers, err: err}
+	}()
+
+	go func() {
+		outgoingUserIDs, err := m.userAdapter.GetPendingOutgoingFriendRequestUserIDs(ctx, user.ID)
+		if err != nil {
+			loads <- friendsLoad{err: err}
+			return
+		}
+		outgoingUsers, err := m.userAdapter.GetUsers(ctx, outgoingUserIDs)
+		loads <- friendsLoad{outgoingUsers: outgoingUsers, err: err}
+	}()
+
+	var friends []users.User
+	var incomingUsers []users.User
+	var outgoingUsers []users.User
+	for range 3 {
+		load := <-loads
+		if load.err != nil {
+			return jsonerr.EchoInternalError(load.err).Echo(c)
+		}
+		friends = append(friends, load.friends...)
+		incomingUsers = append(incomingUsers, load.incomingUsers...)
+		outgoingUsers = append(outgoingUsers, load.outgoingUsers...)
+	}
+
+	result := make(getFriendsResponse, 0, len(friends)+len(incomingUsers)+len(outgoingUsers))
 
 	for _, u := range friends {
 		friend := friendDetails{
@@ -124,20 +162,6 @@ func (m *mux) getFriends(c echo.Context) error {
 		result = append(result, friend)
 	}
 
-	// Incoming pending requests
-	incomingUserIDs, err := m.userAdapter.GetPendingIncomingFriendRequestUserIDs(ctx, user.ID)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
-	}
-
-	incomingUsers, err := m.userAdapter.GetUsers(
-		ctx,
-		incomingUserIDs,
-	)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
-	}
-
 	for _, u := range incomingUsers {
 		result = append(result, newFriendDetails(
 			u.Auth.Username,
@@ -145,20 +169,6 @@ func (m *mux) getFriends(c echo.Context) error {
 			friendStatePendingIncoming,
 			nil,
 		))
-	}
-
-	// Outgoing pending requests
-	outgoingUserIDs, err := m.userAdapter.GetPendingOutgoingFriendRequestUserIDs(ctx, user.ID)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
-	}
-
-	outgoingUsers, err := m.userAdapter.GetUsers(
-		ctx,
-		outgoingUserIDs,
-	)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
 	for _, u := range outgoingUsers {

@@ -12,7 +12,8 @@ const (
 	ConfMongoX509     env.Key = "mongo.x509"     // required for cloud
 
 	//nolint:gosec // not a credential
-	ConfJwtSecret env.Key = "app.jwtSecret" // required
-	ConfDebug     env.Key = "app.debug"     // required
-	ConfAppPort   env.Key = "app.port"      // required
+	ConfJwtSecret  env.Key = "app.jwtSecret"  // required
+	ConfDebug      env.Key = "app.debug"      // required
+	ConfAppPort    env.Key = "app.port"       // required
+	ConfBcryptCost env.Key = "app.bcryptCost" // optional, default 14
 )

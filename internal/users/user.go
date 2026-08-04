@@ -171,8 +171,8 @@ func (m *mongoUserAdapter) GetUser(ctx context.Context, userID id.ID) (User, err
 }
 
 func (m *mongoUserAdapter) GetUsers(ctx context.Context, ids []id.ID) ([]User, error) {
-	if ids == nil {
-		ids = make([]id.ID, 0)
+	if len(ids) == 0 {
+		return []User{}, nil
 	}
 
 	filter := bson.M{
@@ -180,14 +180,28 @@ func (m *mongoUserAdapter) GetUsers(ctx context.Context, ids []id.ID) ([]User, e
 			"$in": ids,
 		},
 	}
-	c, err := m.coll.Find(ctx, filter)
+	opts := options.Find().SetProjection(bson.M{
+		"auth.username":      1,
+		"location":           1,
+		"status":             1,
+		"paused_users":       1,
+	})
+	c, err := m.coll.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("perform find query: %w", err)
 	}
+	defer c.Close(ctx)
 
-	var users []User
-	if err := c.All(ctx, &users); err != nil {
-		return nil, fmt.Errorf("decode query result: %w", err)
+	users := make([]User, 0, len(ids))
+	for c.Next(ctx) {
+		var user User
+		if err := c.Decode(&user); err != nil {
+			return nil, fmt.Errorf("decode query result: %w", err)
+		}
+		users = append(users, user)
+	}
+	if err := c.Err(); err != nil {
+		return nil, fmt.Errorf("read query result: %w", err)
 	}
 
 	return users, nil
@@ -281,43 +295,34 @@ func (m *mongoUserAdapter) UnfriendUser(
 	user id.ID,
 	userToUnfriend id.ID,
 ) error {
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, userToUnfriend); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
-		return err
-	}
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, userToUnfriend, user); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequestsBetween(ctx, user, userToUnfriend); err != nil {
 		return err
 	}
 
-	_, err := m.coll.UpdateOne(
-		ctx,
-		withUserId(user),
-		bson.M{
-			"$pull": bson.M{
-				"subscribed_users": userToUnfriend,
-			},
-			"$unset": bson.M{
-				friendSinceKey(userToUnfriend): "",
-			},
-		},
-	)
+	_, err := m.coll.BulkWrite(ctx, []mongo.WriteModel{
+		mongo.NewUpdateOneModel().
+			SetFilter(withUserId(user)).
+			SetUpdate(bson.M{
+				"$pull": bson.M{
+					"subscribed_users": userToUnfriend,
+				},
+				"$unset": bson.M{
+					friendSinceKey(userToUnfriend): "",
+				},
+			}),
+		mongo.NewUpdateOneModel().
+			SetFilter(withUserId(userToUnfriend)).
+			SetUpdate(bson.M{
+				"$pull": bson.M{
+					"subscribed_users": user,
+				},
+				"$unset": bson.M{
+					friendSinceKey(user): "",
+				},
+			}),
+	})
 	if err != nil {
-		return fmt.Errorf("remove friend from user: %w", err)
-	}
-
-	_, err = m.coll.UpdateOne(
-		ctx,
-		withUserId(userToUnfriend),
-		bson.M{
-			"$pull": bson.M{
-				"subscribed_users": user,
-			},
-			"$unset": bson.M{
-				friendSinceKey(user): "",
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("remove user from friend: %w", err)
+		return fmt.Errorf("remove friendship: %w", err)
 	}
 
 	return nil
@@ -335,24 +340,30 @@ func (m *mongoUserAdapter) AcceptFriendRequest(
 
 	friendSince := m.timer.Now()
 
-	err = m.AddFriend(ctx, user, requester)
+	_, err = m.coll.BulkWrite(ctx, []mongo.WriteModel{
+		mongo.NewUpdateOneModel().
+			SetFilter(withUserId(user)).
+			SetUpdate(bson.M{
+				"$addToSet": bson.M{
+					"subscribed_users": requester,
+				},
+				"$set": bson.M{
+					friendSinceKey(requester): friendSince,
+				},
+			}),
+		mongo.NewUpdateOneModel().
+			SetFilter(withUserId(requester)).
+			SetUpdate(bson.M{
+				"$addToSet": bson.M{
+					"subscribed_users": user,
+				},
+				"$set": bson.M{
+					friendSinceKey(user): friendSince,
+				},
+			}),
+	})
 	if err != nil {
-		return err
-	}
-
-	err = m.SetFriendSince(ctx, user, requester, friendSince)
-	if err != nil {
-		return err
-	}
-
-	err = m.AddFriend(ctx, requester, user)
-	if err != nil {
-		return err
-	}
-
-	err = m.SetFriendSince(ctx, requester, user, friendSince)
-	if err != nil {
-		return err
+		return fmt.Errorf("accept friend request: %w", err)
 	}
 
 	return nil
@@ -363,10 +374,7 @@ func (m *mongoUserAdapter) RejectFriendRequest(
 	user id.ID,
 	requester id.ID,
 ) error {
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, user, requester); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
-		return err
-	}
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequest(ctx, requester, user); err != nil && !errors.Is(err, ErrFriendRequestNotExists) {
+	if err := m.pendingFriendRequestAdapter.DeleteFriendRequestsBetween(ctx, user, requester); err != nil {
 		return err
 	}
 
