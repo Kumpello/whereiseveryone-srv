@@ -1,0 +1,24 @@
+services:
+  goserver:
+    build: .
+    container_name: goserver
+    restart: unless-stopped
+    command: ["/app/app-srv", "--config=/app/.env/docker.json"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./.env:/app/.env:ro
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: bitnami/mongodb:latest
+    container_name: mongodb
+    restart: unless-stopped
+    env_file:
+      - secrets.env
+    volumes:
+      - mongodb_data:/bitnami/mongodb
+
+volumes:
+  mongodb_data:

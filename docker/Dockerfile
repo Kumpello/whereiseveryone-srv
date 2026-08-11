@@ -20,7 +20,6 @@ WORKDIR /app
 
 COPY --from=builder /tmp/build/out/app-srv /app/app-srv
 COPY --from=builder /tmp/build/out/app-cli /app/app-cli
-COPY --from=builder /tmp/build/.env /app/.env
 COPY --from=builder /tmp/build/docs /app/docs
 
 EXPOSE 8080
