@@ -32,11 +32,11 @@ import (
 )
 
 const (
-	defaultBcryptCost     = crypto.DefaultPasswordHashCost
-	indexCreationTimeout  = 30 * time.Second
-	serverReadTimeout     = 10 * time.Second
-	serverWriteTimeout    = 30 * time.Second
-	serverIdleTimeout     = 120 * time.Second
+	defaultBcryptCost    = crypto.DefaultPasswordHashCost
+	indexCreationTimeout = 30 * time.Second
+	serverReadTimeout    = 10 * time.Second
+	serverWriteTimeout   = 30 * time.Second
+	serverIdleTimeout    = 120 * time.Second
 )
 
 // @title WhereIsEveryone
@@ -50,7 +50,7 @@ const (
 // @in header
 // @name Authorization
 
-// @BasePath /api
+// @BasePath /
 
 func main() {
 	// Flags
@@ -102,7 +102,7 @@ func main() {
 
 	validate := validator.New()
 	e := webapi.NewEcho(
-		"/api",
+		"/",
 		validate,
 		jwtInstance,
 		webapi.EchoRouters{

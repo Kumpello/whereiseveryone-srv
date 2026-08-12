@@ -489,7 +489,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "",
-	BasePath:         "/api",
+	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "WhereIsEveryone",
 	Description:      "This is a sample server for WhereIsEveryone",

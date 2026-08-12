@@ -10,7 +10,7 @@
         },
         "version": "1.0"
     },
-    "basePath": "/api",
+    "basePath": "/",
     "paths": {
         "/auth/login": {
             "post": {
