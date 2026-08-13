@@ -102,7 +102,7 @@ func main() {
 
 	validate := validator.New()
 	e := webapi.NewEcho(
-		"/",
+		"",
 		validate,
 		jwtInstance,
 		webapi.EchoRouters{
