@@ -6,14 +6,19 @@ definitions:
         description: ID is user id (uuid)
         type: string
       refresh_token:
-        description: RefreshToken user refresh token
+        description: RefreshToken refresh-only token for /auth/refresh; cannot be
+          used as a Bearer token
         type: string
       token:
-        description: Token user auth token (Bearer)
+        description: Token access token for Bearer authentication; must match the
+          current stored session
         type: string
     type: object
   auth.logInRequest:
     properties:
+      device_token:
+        description: DeviceToken identifies the client device for single-device auth
+        type: string
       password:
         description: Password user password
         type: string
@@ -24,8 +29,21 @@ definitions:
     - password
     - username
     type: object
+  auth.refreshTokenRequest:
+    properties:
+      device_token:
+        description: DeviceToken identifies the client device requesting refresh
+        type: string
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   auth.signUpRequest:
     properties:
+      device_token:
+        description: DeviceToken identifies the client device for single-device auth
+        type: string
       password:
         description: Password user password, min 8 characters
         minLength: 8
@@ -53,15 +71,32 @@ definitions:
     type: object
   me.friendDetails:
     properties:
+      friend_since:
+        type: string
       location:
         $ref: '#/definitions/me.locationDetails'
       state:
-        type: string
+        $ref: '#/definitions/me.friendState'
       status:
         type: string
       username:
         type: string
     type: object
+  me.friendRequest:
+    properties:
+      username:
+        type: string
+    type: object
+  me.friendState:
+    enum:
+    - accepted
+    - pending_incoming
+    - pending_outgoing
+    type: string
+    x-enum-varnames:
+    - friendStateAccepted
+    - friendStatePendingIncoming
+    - friendStatePendingOutgoing
   me.locationDetails:
     properties:
       accuracy:
@@ -77,13 +112,10 @@ definitions:
         type: number
       longitude:
         type: number
+      speed:
+        type: number
     type: object
-  me.friendRequest:
-    properties:
-      username:
-        type: string
-    type: object
-  me.observeRequest:
+  me.pausedFriendDetails:
     properties:
       username:
         type: string
@@ -102,6 +134,8 @@ definitions:
       latitude:
         type: number
       longitude:
+        type: number
+      speed:
         type: number
     type: object
   me.updateStatusRequest:
@@ -154,6 +188,47 @@ paths:
       summary: log in
       tags:
       - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: requires the current refresh-purpose token; replaces both tokens
+        and revokes previous access tokens
+      parameters:
+      - description: refresh token
+        in: body
+        name: refresh
+        required: true
+        schema:
+          $ref: '#/definitions/auth.refreshTokenRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.authResponse'
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: expired refresh token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "403":
+          description: invalid refresh token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: refresh auth tokens
+      tags:
+      - auth
   /auth/signup:
     post:
       consumes:
@@ -186,59 +261,11 @@ paths:
       summary: sign up as a new user
       tags:
       - auth
-  /me/friends:
-    get:
-      description: returns all details about observed users
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/me.friendDetails'
-            type: array
-        "500":
-          description: internal server error
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-      summary: get friends details
-      tags:
-      - me
   /me/friend:
-    post:
-      consumes:
-      - application/json
-      description: send friend request to another user
-      parameters:
-      - description: user to friend
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/me.friendRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: invalid request
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "404":
-          description: requested user not exists
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "500":
-          description: internal server error
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-      summary: send friend request
-      tags:
-      - me
     delete:
       consumes:
       - application/json
-      description: remove friend and clear pending requests between users
+      description: removes friend and clears pending requests between users
       parameters:
       - description: user to unfriend
         in: body
@@ -253,6 +280,10 @@ paths:
           description: invalid request
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "404":
           description: requested user not exists
           schema:
@@ -264,11 +295,44 @@ paths:
       summary: remove friend
       tags:
       - me
+    post:
+      consumes:
+      - application/json
+      description: sends friend request to another user
+      parameters:
+      - description: user to friend
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: send friend request
+      tags:
+      - me
   /me/friend/accept:
     post:
       consumes:
       - application/json
-      description: accept a pending friend request from another user
+      description: accepts pending friend request from another user
       parameters:
       - description: user to accept
         in: body
@@ -281,6 +345,10 @@ paths:
           description: No Content
         "400":
           description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: invalid token
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "404":
@@ -298,7 +366,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: reject a pending friend request from another user
+      description: rejects pending friend request from another user
       parameters:
       - description: user to reject
         in: body
@@ -313,6 +381,10 @@ paths:
           description: invalid request
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "404":
           description: requested user not exists
           schema:
@@ -324,18 +396,57 @@ paths:
       summary: reject friend request
       tags:
       - me
-  /me/sharing/stop:
-    post:
+  /me/friends:
+    get:
+      description: returns accepted friends and pending friend requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/me.friendDetails'
+            type: array
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: get friends details
+      tags:
+      - me
+  /me/location:
+    delete:
+      description: nullify logged user location
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: wipe location
+      tags:
+      - me
+    put:
       consumes:
       - application/json
-      description: stop sharing location with another user
+      description: update logged user location
       parameters:
-      - description: user to stop sharing with
+      - description: update location object
         in: body
-        name: user
+        name: location
         required: true
         schema:
-          $ref: '#/definitions/me.friendRequest'
+          $ref: '#/definitions/me.updateLocationRequest'
       responses:
         "204":
           description: No Content
@@ -343,11 +454,38 @@ paths:
           description: invalid request
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
-      summary: stop sharing location
+      summary: update location
+      tags:
+      - me
+  /me/sharing:
+    get:
+      description: returns list of friends with whom location sharing is paused
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/me.pausedFriendDetails'
+            type: array
+        "401":
+          description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: get paused friends details
       tags:
       - me
   /me/sharing/resume:
@@ -376,6 +514,32 @@ paths:
       summary: resume sharing location
       tags:
       - me
+  /me/sharing/stop:
+    post:
+      consumes:
+      - application/json
+      description: stop sharing location with another user
+      parameters:
+      - description: user to stop sharing with
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/me.friendRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: stop sharing location
+      tags:
+      - me
   /me/status:
     put:
       consumes:
@@ -397,44 +561,6 @@ paths:
           description: invalid request
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
-        "500":
-          description: internal server error
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-      summary: update status
-      tags:
-      - me
-  /me/location:
-    put:
-      consumes:
-      - application/json
-      description: update logged user location
-      parameters:
-      - description: update location object
-        in: body
-        name: location
-        required: true
-        schema:
-          $ref: '#/definitions/me.updateLocationRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: invalid request
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "500":
-          description: internal server error
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-      summary: update location
-      tags:
-      - me
-    delete:
-      description: nullify logged user location
-      responses:
-        "204":
-          description: No Content
         "401":
           description: invalid token
           schema:
@@ -443,7 +569,7 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
-      summary: wipe location
+      summary: update status
       tags:
       - me
 securityDefinitions:

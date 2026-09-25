@@ -51,7 +51,7 @@ func TestJWTValidatorMapsExpiredTokenToAppError(t *testing.T) {
 	}
 
 	expiredJWT := jwt.NewJWT(staticTimer{now: baseTime.Add(2 * time.Minute)}, []byte("secret"), time.Minute, time.Hour)
-	_, err = expiredJWT.ValidateToken(token)
+	_, err = expiredJWT.ValidateAccessToken(token)
 	if !errors.Is(err, jwt.ErrTokenExpired) {
 		t.Fatalf("expected expired token error, got %v", err)
 	}

@@ -105,6 +105,7 @@ func main() {
 		"",
 		validate,
 		jwtInstance,
+		usersAdapter,
 		webapi.EchoRouters{
 			Swagger:    echoSwagger.WrapHandler,
 			AuthRouter: authRouter,

@@ -32,7 +32,7 @@ func BenchmarkGenerateTokens(b *testing.B) {
 	}
 }
 
-func BenchmarkValidateToken(b *testing.B) {
+func BenchmarkValidateAccessToken(b *testing.B) {
 	j := NewJWT(
 		benchmarkTimer{now: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)},
 		[]byte("benchmark-secret"),
@@ -48,7 +48,7 @@ func BenchmarkValidateToken(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := j.ValidateToken(token); err != nil {
+		if _, err := j.ValidateAccessToken(token); err != nil {
 			b.Fatalf("validate token: %v", err)
 		}
 	}

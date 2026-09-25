@@ -238,7 +238,7 @@ func (m *mux) logIn(c echo.Context) error {
 // refreshToken
 //
 // @summary refresh auth tokens
-// @description generates new access and refresh tokens
+// @description requires the current refresh-purpose token; replaces both tokens and revokes previous access tokens
 // @tags auth
 // @accept json
 // @produces json
@@ -267,8 +267,8 @@ func (m *mux) refreshToken(c echo.Context) error {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
 	}
 
-	// Validate JWT structure and expiration
-	v, err := m.jwt.ValidateToken(request.RefreshToken)
+	// Only refresh-purpose tokens can renew the stored session.
+	v, err := m.jwt.ValidateRefreshToken(request.RefreshToken)
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
 			return jsonerr.EchoExpiredTokenError().Echo(c)

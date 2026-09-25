@@ -10,7 +10,7 @@
         },
         "version": "1.0"
     },
-    "basePath": "",
+    "basePath": "/",
     "paths": {
         "/auth/login": {
             "post": {
@@ -48,6 +48,67 @@
                     },
                     "403": {
                         "description": "forbidden (invalid password)",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "404": {
+                        "description": "user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "description": "requires the current refresh-purpose token; replaces both tokens and revokes previous access tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "refresh auth tokens",
+                "parameters": [
+                    {
+                        "description": "refresh token",
+                        "name": "refresh",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.refreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.authResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "401": {
+                        "description": "expired refresh token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "403": {
+                        "description": "invalid refresh token",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -116,38 +177,9 @@
                 }
             }
         },
-        "/me/friends": {
-            "get": {
-                "description": "returns all details about observed users",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "me"
-                ],
-                "summary": "get friends details",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/me.friendDetails"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    }
-                }
-            }
-        },
         "/me/friend": {
             "post": {
-                "description": "send friend request to another user",
+                "description": "sends friend request to another user",
                 "consumes": [
                     "application/json"
                 ],
@@ -176,6 +208,12 @@
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "404": {
                         "description": "requested user not exists",
                         "schema": {
@@ -191,7 +229,7 @@
                 }
             },
             "delete": {
-                "description": "remove friend and clear pending requests between users",
+                "description": "removes friend and clears pending requests between users",
                 "consumes": [
                     "application/json"
                 ],
@@ -220,6 +258,12 @@
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "404": {
                         "description": "requested user not exists",
                         "schema": {
@@ -237,7 +281,7 @@
         },
         "/me/friend/accept": {
             "post": {
-                "description": "accept a pending friend request from another user",
+                "description": "accepts pending friend request from another user",
                 "consumes": [
                     "application/json"
                 ],
@@ -266,6 +310,12 @@
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "404": {
                         "description": "requested user not exists",
                         "schema": {
@@ -283,7 +333,7 @@
         },
         "/me/friend/reject": {
             "post": {
-                "description": "reject a pending friend request from another user",
+                "description": "rejects pending friend request from another user",
                 "consumes": [
                     "application/json"
                 ],
@@ -312,6 +362,12 @@
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "404": {
                         "description": "requested user not exists",
                         "schema": {
@@ -327,24 +383,59 @@
                 }
             }
         },
-        "/me/sharing/stop": {
-            "post": {
-                "description": "stop sharing location with another user",
+        "/me/friends": {
+            "get": {
+                "description": "returns accepted friends and pending friend requests",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "get friends details",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/me.friendDetails"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/location": {
+            "put": {
+                "description": "update logged user location",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "me"
                 ],
-                "summary": "stop sharing location",
+                "summary": "update location",
                 "parameters": [
                     {
-                        "description": "user to stop sharing with",
-                        "name": "user",
+                        "description": "update location object",
+                        "name": "location",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/me.friendRequest"
+                            "$ref": "#/definitions/me.updateLocationRequest"
                         }
                     }
                 ],
@@ -354,6 +445,71 @@
                     },
                     "400": {
                         "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "nullify logged user location",
+                "tags": [
+                    "me"
+                ],
+                "summary": "wipe location",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/sharing": {
+            "get": {
+                "description": "returns list of friends with whom location sharing is paused",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "get paused friends details",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/me.pausedFriendDetails"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "invalid token",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -407,24 +563,24 @@
                 }
             }
         },
-        "/me/location": {
-            "put": {
-                "description": "update logged user location",
+        "/me/sharing/stop": {
+            "post": {
+                "description": "stop sharing location with another user",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "me"
                 ],
-                "summary": "update location",
+                "summary": "stop sharing location",
                 "parameters": [
                     {
-                        "description": "update location object",
-                        "name": "location",
+                        "description": "user to stop sharing with",
+                        "name": "user",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/me.updateLocationRequest"
+                            "$ref": "#/definitions/me.friendRequest"
                         }
                     }
                 ],
@@ -434,30 +590,6 @@
                     },
                     "400": {
                         "description": "invalid request",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    },
-                    "500": {
-                        "description": "internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "nullify logged user location",
-                "tags": [
-                    "me"
-                ],
-                "summary": "wipe location",
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "invalid token",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -505,6 +637,12 @@
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "401": {
+                        "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -524,11 +662,11 @@
                     "type": "string"
                 },
                 "refresh_token": {
-                    "description": "RefreshToken user refresh token",
+                    "description": "RefreshToken refresh-only token for /auth/refresh; cannot be used as a Bearer token",
                     "type": "string"
                 },
                 "token": {
-                    "description": "Token user auth token (Bearer)",
+                    "description": "Token access token for Bearer authentication; must match the current stored session",
                     "type": "string"
                 }
             }
@@ -540,12 +678,31 @@
                 "username"
             ],
             "properties": {
+                "device_token": {
+                    "description": "DeviceToken identifies the client device for single-device auth",
+                    "type": "string"
+                },
                 "password": {
                     "description": "Password user password",
                     "type": "string"
                 },
                 "username": {
                     "description": "Username",
+                    "type": "string"
+                }
+            }
+        },
+        "auth.refreshTokenRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "device_token": {
+                    "description": "DeviceToken identifies the client device requesting refresh",
+                    "type": "string"
+                },
+                "refresh_token": {
                     "type": "string"
                 }
             }
@@ -557,6 +714,10 @@
                 "username"
             ],
             "properties": {
+                "device_token": {
+                    "description": "DeviceToken identifies the client device for single-device auth",
+                    "type": "string"
+                },
                 "password": {
                     "description": "Password user password, min 8 characters",
                     "type": "string",
@@ -588,8 +749,14 @@
         "me.friendDetails": {
             "type": "object",
             "properties": {
+                "friend_since": {
+                    "type": "string"
+                },
                 "location": {
                     "$ref": "#/definitions/me.locationDetails"
+                },
+                "state": {
+                    "$ref": "#/definitions/me.friendState"
                 },
                 "status": {
                     "type": "string"
@@ -598,6 +765,27 @@
                     "type": "string"
                 }
             }
+        },
+        "me.friendRequest": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "me.friendState": {
+            "type": "string",
+            "enum": [
+                "accepted",
+                "pending_incoming",
+                "pending_outgoing"
+            ],
+            "x-enum-varnames": [
+                "friendStateAccepted",
+                "friendStatePendingIncoming",
+                "friendStatePendingOutgoing"
+            ]
         },
         "me.locationDetails": {
             "type": "object",
@@ -620,10 +808,13 @@
                 },
                 "longitude": {
                     "type": "number"
+                },
+                "speed": {
+                    "type": "number"
                 }
             }
         },
-        "me.observeRequest": {
+        "me.pausedFriendDetails": {
             "type": "object",
             "properties": {
                 "username": {
@@ -651,6 +842,9 @@
                     "type": "number"
                 },
                 "longitude": {
+                    "type": "number"
+                },
+                "speed": {
                     "type": "number"
                 }
             }

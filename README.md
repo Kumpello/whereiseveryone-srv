@@ -86,7 +86,20 @@ type authResponse struct {
 ```
 
 All requests (except `/auth/*`) are required to have JWT token attached (`Header -> Authorization: Bearer <<token>>`).
-When token expires a user must renew it (with `/login`).
+Protected routes accept only access tokens with `token_use=access`, and check that the
+token matches the user's current stored access token on every request. Refresh tokens
+with `token_use=refresh` can only be used with `/auth/refresh`, which also checks the
+stored refresh token. Login, refresh, and device-conflict token replacement invalidate
+previous access tokens for subsequent requests. Tokens have random IDs so replacement
+also works within the same second. Requests already authorized may finish.
+
+When an access token expires, renew the pair with `/auth/refresh` or log in again using
+`/auth/login`. Expired tokens return 401; wrong-purpose or revoked tokens return 403.
+Session-store failures deny access with 500.
+
+Deploying token-purpose validation invalidates all previously issued tokens without
+`token_use`; existing users must log in again. No database migration or new index is
+required. Protected requests now require an available MongoDB session lookup.
 
 # Development
 

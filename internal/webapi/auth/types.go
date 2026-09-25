@@ -21,9 +21,9 @@ type logInRequest struct {
 type authResponse struct {
 	// ID is user id (uuid)
 	ID string `json:"id"`
-	// Token user auth token (Bearer)
+	// Token access token for Bearer authentication; must match the current stored session
 	Token string `json:"token"`
-	// RefreshToken user refresh token
+	// RefreshToken refresh-only token for /auth/refresh; cannot be used as a Bearer token
 	RefreshToken string `json:"refresh_token"`
 }
 
