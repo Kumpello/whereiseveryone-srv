@@ -125,11 +125,21 @@ type authResponse struct {
 
 All requests (except `/auth/*`) are required to have JWT token attached (`Header -> Authorization: Bearer <<token>>`).
 Protected routes accept only access tokens with `token_use=access`, and check that the
-token matches the user's current stored access token on every request. Refresh tokens
-with `token_use=refresh` can only be used with `/auth/refresh`, which also checks the
-stored refresh token. Login, refresh, and device-conflict token replacement invalidate
-previous access tokens for subsequent requests. Tokens have random IDs so replacement
-also works within the same second. Requests already authorized may finish.
+token matches the user's stored session on every request. Refresh tokens with
+`token_use=refresh` can only be used with `/auth/refresh`. Rotation atomically matches
+the previous refresh credential and device, so only one concurrent request succeeds;
+reuse returns 403 immediately. Refresh credentials are stored as SHA-256 digests.
+Existing plaintext credentials migrate on the next login or rotation, without an
+index change. Tokens have random IDs so replacement also works within the same second.
+
+After refresh, the immediately preceding access token remains valid for up to 120
+seconds, ending earlier at its JWT expiration or the next token replacement. Login
+and device-conflict revocation clear this grace period immediately. The grace period
+does not permit reuse of refresh tokens or extend JWT expiration. Requests already
+authorized may finish.
+
+Run the database rotation regression tests against an isolated MongoDB instance with
+`MONGO_TEST_URI=mongodb://127.0.0.1:27028 go test -race ./internal/users`.
 
 When an access token expires, renew the pair with `/auth/refresh` or log in again using
 `/auth/login`. Expired tokens return 401; wrong-purpose or revoked tokens return 403.

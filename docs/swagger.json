@@ -78,7 +78,7 @@
         },
         "/auth/refresh": {
             "post": {
-                "description": "requires the current refresh-purpose token and bound device_token; replaces both tokens and revokes previous access tokens",
+                "description": "atomically consumes the current refresh-purpose token for the bound device; refresh reuse is rejected immediately; the previous access token remains valid for up to 120 seconds, subject to its expiration",
                 "consumes": [
                     "application/json"
                 ],

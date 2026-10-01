@@ -82,7 +82,7 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 		return false, err
 	}
 
-	err = m.userAdapter.UpdateTokens(ctx, user.ID, &token, &refresh, &clearDeviceToken)
+	err = m.userAdapter.ReplaceTokens(ctx, user.ID, user.Auth, token, refresh, clearDeviceToken)
 	if err != nil {
 		return false, err
 	}
@@ -219,6 +219,9 @@ func (m *mux) logIn(c echo.Context) error {
 	}
 
 	if conflicted, err := m.handleDeviceTokenConflict(reqCtx, u, request.DeviceToken); err != nil {
+		if errors.Is(err, users.ErrSessionChanged) {
+			return jsonerr.EchoForbiddenError().Echo(c)
+		}
 		return jsonerr.EchoInternalError(err).Echo(c)
 	} else if conflicted {
 		return c.JSON(http.StatusConflict, map[string]string{"message": "device token conflict"})
@@ -238,7 +241,7 @@ func (m *mux) logIn(c echo.Context) error {
 // refreshToken
 //
 // @summary refresh auth tokens
-// @description requires the current refresh-purpose token and bound device_token; replaces both tokens and revokes previous access tokens
+// @description atomically consumes the current refresh-purpose token for the bound device; refresh reuse is rejected immediately; the previous access token remains valid for up to 120 seconds, subject to its expiration
 // @tags auth
 // @accept json
 // @produces json
@@ -300,7 +303,7 @@ func (m *mux) refreshToken(c echo.Context) error {
 	}
 
 	// Validate provided refresh token matches stored refresh token
-	if u.Auth.RefreshToken != request.RefreshToken {
+	if !u.Auth.MatchesRefresh(request.RefreshToken) {
 		return jsonerr.EchoForbiddenError().Echo(c)
 	}
 	// A refresh credential cannot establish a device binding for a legacy or
@@ -310,6 +313,9 @@ func (m *mux) refreshToken(c echo.Context) error {
 	}
 
 	if conflicted, err := m.handleDeviceTokenConflict(reqCtx, u, request.DeviceToken); err != nil {
+		if errors.Is(err, users.ErrSessionChanged) {
+			return jsonerr.EchoForbiddenError().Echo(c)
+		}
 		return jsonerr.EchoInternalError(err).Echo(c)
 	} else if conflicted {
 		return c.JSON(http.StatusConflict, map[string]string{
@@ -326,13 +332,17 @@ func (m *mux) refreshToken(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	err = m.userAdapter.UpdateTokens(
+	err = m.userAdapter.ReplaceTokens(
 		reqCtx,
 		u.ID,
-		&token,
-		&refresh,
-		nil,
+		u.Auth,
+		token,
+		refresh,
+		u.Auth.DeviceToken,
 	)
+	if errors.Is(err, users.ErrSessionChanged) {
+		return jsonerr.EchoForbiddenError().Echo(c)
+	}
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}

@@ -2,7 +2,6 @@ package webapi
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"net/http"
 	"strings"
@@ -120,10 +119,9 @@ func NewEcho(
 				log.WithError(err).Error("check authenticated session")
 				return c.String(http.StatusInternalServerError, "internal error")
 			}
-			// The exact stored token is the revocable session credential. Its random
-			// token ID makes replacements distinct even within the same second.
+			// Refresh preserves the previous access token for a bounded grace period.
 			if strings.TrimSpace(user.Auth.DeviceToken) == "" ||
-				subtle.ConstantTimeCompare([]byte(user.Auth.Token), []byte(signed)) != 1 {
+				!user.Auth.MatchesAccess(signed, jwtInstance.Now()) {
 				return c.String(http.StatusForbidden, "invalid session")
 			}
 			c.Set("user", v)

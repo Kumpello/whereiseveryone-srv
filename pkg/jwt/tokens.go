@@ -24,6 +24,9 @@ func NewJWT(timer timer.Timer, secret []byte, validity time.Duration, refreshVal
 	return &JWT{timer: timer, secret: secret, validity: validity, refreshValidity: refreshValidity}
 }
 
+// Now provides the same clock for token expiration and session grace checks.
+func (j JWT) Now() time.Time { return j.timer.Now() }
+
 type SignedToken struct {
 	UserName string
 	ID       string
