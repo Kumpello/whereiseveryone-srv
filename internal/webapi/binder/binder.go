@@ -18,7 +18,7 @@ const requestTimeout = 15 * time.Second
 // Allows to use Context without generic type
 type BaseContext interface {
 	Context() context.Context
-	Cancel() context.CancelFunc
+	Cancel()
 	Echo() echo.Context
 	UserID() id.ID
 	TokenData() jwt.SignedToken
@@ -43,8 +43,10 @@ func (c Context[T]) Context() context.Context {
 	return c.ctx
 }
 
-func (c Context[T]) Cancel() context.CancelFunc {
-	return c.cancel
+// Cancel releases the request context and its timeout resources. It is safe to
+// call repeatedly and should be deferred by the caller after successful binding.
+func (c Context[T]) Cancel() {
+	c.cancel()
 }
 
 func (c Context[T]) Echo() echo.Context { //nolint:ireturn // nolintlint
@@ -66,6 +68,8 @@ type StructValidator interface {
 // BindRequest bind requests returning Context, user data (if requireAuth) and an error.
 // T must be a simple type to be validated (pointers are not validated).
 // Binder returns an jsonerr.JSONError but it doesn't bind the error.
+// On failure, the returned context is already canceled. On success, the caller
+// owns cancellation and should defer result.Cancel().
 func BindRequest[T any](
 	c echo.Context,
 	requireAuth bool,
@@ -83,11 +87,13 @@ func BindRequest[T any](
 	if requireAuth {
 		jwtToken, err := webapi.GetJWTToken(c)
 		if err != nil {
+			cancel()
 			c.Logger().Errorf("Failed to get JWT token: %v", err)
 			return result, webapi.JWTErrorToJSONError(err)
 		}
 		requesterID, err := id.FromString(jwtToken.ID)
 		if err != nil {
+			cancel()
 			c.Logger().Errorf("Failed to get requester ID: %v", err)
 			return result, jsonerr.EchoInvalidRequestError(err)
 		}
@@ -97,12 +103,14 @@ func BindRequest[T any](
 
 	// Obtain request
 	if err := c.Bind(&t); err != nil {
+		cancel()
 		c.Logger().Errorf("Failed to bind request: %v", err)
 		return result, jsonerr.EchoInvalidRequestError(err)
 	}
 
 	if val := reflect.ValueOf(t); val.Kind() == reflect.Struct { // don't validate interface{} type
 		if err := c.Validate(t); err != nil {
+			cancel()
 			c.Logger().Errorf("Failed to validate request: %v", err)
 			return result, jsonerr.EchoInvalidRequestError(err)
 		}

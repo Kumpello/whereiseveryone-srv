@@ -202,7 +202,7 @@ package request
 
 type BaseContext interface {
 	Context() context.Context
-	Cancel() context.CancelFunc
+	Cancel()
 	Echo() echo.Context
 	UserID() id.ID
 	TokenData() jwt.SignedToken
