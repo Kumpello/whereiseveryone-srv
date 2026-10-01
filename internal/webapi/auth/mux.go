@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"whereiseveryone/internal/users"
@@ -69,7 +70,9 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 }
 
 func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, incomingDeviceToken string) (bool, error) {
-	if incomingDeviceToken == "" || user.Auth.DeviceToken == "" || user.Auth.DeviceToken == incomingDeviceToken {
+	// Requests have already supplied a nonblank device token. Only password login
+	// may bind a previously unbound account; refresh rejects unbound sessions.
+	if strings.TrimSpace(user.Auth.DeviceToken) == "" || user.Auth.DeviceToken == incomingDeviceToken {
 		return false, nil
 	}
 
@@ -111,6 +114,9 @@ func (m *mux) signUp(c echo.Context) error {
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
 	}
+	if strings.TrimSpace(request.DeviceToken) == "" {
+		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
+	}
 
 	releasePasswordSlot, err := m.acquirePasswordSlot(reqCtx)
 	if err != nil {
@@ -148,12 +154,7 @@ func (m *mux) signUp(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	var deviceTokenPtr *string
-	if request.DeviceToken != "" {
-		deviceTokenPtr = &request.DeviceToken
-	}
-
-	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, deviceTokenPtr); err != nil {
+	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, &request.DeviceToken); err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
@@ -176,6 +177,7 @@ func (m *mux) signUp(c echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 403 {object} jsonerr.JSONError "forbidden (invalid password)"
 // @failure 404 {object} jsonerr.JSONError "user not exists"
+// @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/login [POST]
 func (m *mux) logIn(c echo.Context) error {
@@ -188,6 +190,9 @@ func (m *mux) logIn(c echo.Context) error {
 	}
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+	if strings.TrimSpace(request.DeviceToken) == "" {
+		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
 	}
 
 	u, err := m.userAdapter.GetUserByUsername(reqCtx, request.Username)
@@ -213,18 +218,13 @@ func (m *mux) logIn(c echo.Context) error {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
-	var deviceTokenPtr *string
-	if request.DeviceToken != "" {
-		deviceTokenPtr = &request.DeviceToken
-	}
-
 	if conflicted, err := m.handleDeviceTokenConflict(reqCtx, u, request.DeviceToken); err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	} else if conflicted {
 		return c.JSON(http.StatusConflict, map[string]string{"message": "device token conflict"})
 	}
 
-	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, deviceTokenPtr); err != nil {
+	if err := m.userAdapter.UpdateTokens(reqCtx, u.ID, &token, &refresh, &request.DeviceToken); err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
@@ -238,7 +238,7 @@ func (m *mux) logIn(c echo.Context) error {
 // refreshToken
 //
 // @summary refresh auth tokens
-// @description requires the current refresh-purpose token; replaces both tokens and revokes previous access tokens
+// @description requires the current refresh-purpose token and bound device_token; replaces both tokens and revokes previous access tokens
 // @tags auth
 // @accept json
 // @produces json
@@ -248,6 +248,7 @@ func (m *mux) logIn(c echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "expired refresh token"
 // @failure 403 {object} jsonerr.JSONError "invalid refresh token"
 // @failure 404 {object} jsonerr.JSONError "user not exists"
+// @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/refresh [POST]
 func (m *mux) refreshToken(c echo.Context) error {
@@ -265,6 +266,9 @@ func (m *mux) refreshToken(c echo.Context) error {
 
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+	if strings.TrimSpace(request.DeviceToken) == "" {
+		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
 	}
 
 	// Only refresh-purpose tokens can renew the stored session.
@@ -297,6 +301,11 @@ func (m *mux) refreshToken(c echo.Context) error {
 
 	// Validate provided refresh token matches stored refresh token
 	if u.Auth.RefreshToken != request.RefreshToken {
+		return jsonerr.EchoForbiddenError().Echo(c)
+	}
+	// A refresh credential cannot establish a device binding for a legacy or
+	// revoked session. Require password login to establish a new session.
+	if strings.TrimSpace(u.Auth.DeviceToken) == "" {
 		return jsonerr.EchoForbiddenError().Echo(c)
 	}
 

@@ -17,7 +17,8 @@ definitions:
   auth.logInRequest:
     properties:
       device_token:
-        description: DeviceToken identifies the client device for single-device auth
+        description: DeviceToken is a required, nonblank client device identifier
+          for single-device auth
         type: string
       password:
         description: Password user password
@@ -26,23 +27,27 @@ definitions:
         description: Username
         type: string
     required:
+    - device_token
     - password
     - username
     type: object
   auth.refreshTokenRequest:
     properties:
       device_token:
-        description: DeviceToken identifies the client device requesting refresh
+        description: DeviceToken is required and must match the device bound to the
+          current session
         type: string
       refresh_token:
         type: string
     required:
+    - device_token
     - refresh_token
     type: object
   auth.signUpRequest:
     properties:
       device_token:
-        description: DeviceToken identifies the client device for single-device auth
+        description: DeviceToken is a required, nonblank client device identifier
+          for single-device auth
         type: string
       password:
         description: Password user password, min 8 characters
@@ -52,6 +57,7 @@ definitions:
         description: Username username, must be unique
         type: string
     required:
+    - device_token
     - password
     - username
     type: object
@@ -181,6 +187,12 @@ paths:
           description: user not exists
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "409":
+          description: device token conflict; session revoked, log in again
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: internal server error
           schema:
@@ -192,8 +204,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: requires the current refresh-purpose token; replaces both tokens
-        and revokes previous access tokens
+      description: requires the current refresh-purpose token and bound device_token;
+        replaces both tokens and revokes previous access tokens
       parameters:
       - description: refresh token
         in: body
@@ -222,6 +234,12 @@ paths:
           description: user not exists
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "409":
+          description: device token conflict; session revoked, log in again
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: internal server error
           schema:

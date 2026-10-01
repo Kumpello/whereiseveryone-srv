@@ -65,6 +65,15 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "409": {
+                        "description": "device token conflict; session revoked, log in again",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -76,7 +85,7 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
-                "description": "requires the current refresh-purpose token; replaces both tokens and revokes previous access tokens",
+                "description": "requires the current refresh-purpose token and bound device_token; replaces both tokens and revokes previous access tokens",
                 "consumes": [
                     "application/json"
                 ],
@@ -124,6 +133,15 @@ const docTemplate = `{
                         "description": "user not exists",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "409": {
+                        "description": "device token conflict; session revoked, log in again",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
@@ -681,12 +699,13 @@ const docTemplate = `{
         "auth.logInRequest": {
             "type": "object",
             "required": [
+                "device_token",
                 "password",
                 "username"
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken identifies the client device for single-device auth",
+                    "description": "DeviceToken is a required, nonblank client device identifier for single-device auth",
                     "type": "string"
                 },
                 "password": {
@@ -702,11 +721,12 @@ const docTemplate = `{
         "auth.refreshTokenRequest": {
             "type": "object",
             "required": [
+                "device_token",
                 "refresh_token"
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken identifies the client device requesting refresh",
+                    "description": "DeviceToken is required and must match the device bound to the current session",
                     "type": "string"
                 },
                 "refresh_token": {
@@ -717,12 +737,13 @@ const docTemplate = `{
         "auth.signUpRequest": {
             "type": "object",
             "required": [
+                "device_token",
                 "password",
                 "username"
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken identifies the client device for single-device auth",
+                    "description": "DeviceToken is a required, nonblank client device identifier for single-device auth",
                     "type": "string"
                 },
                 "password": {

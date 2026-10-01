@@ -100,13 +100,20 @@ The server also verifies Mongo indexes during startup; the CLI command remains u
 package auth
 
 type signUpRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	Username    string `json:"username" validate:"required"`
+	Password    string `json:"password" validate:"required,min=8"`
+	DeviceToken string `json:"device_token" validate:"required"`
 }
 
 type logInRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	Username    string `json:"username" validate:"required"`
+	Password    string `json:"password" validate:"required"`
+	DeviceToken string `json:"device_token" validate:"required"`
+}
+
+type refreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+	DeviceToken  string `json:"device_token" validate:"required"`
 }
 
 type authResponse struct {
@@ -127,6 +134,23 @@ also works within the same second. Requests already authorized may finish.
 When an access token expires, renew the pair with `/auth/refresh` or log in again using
 `/auth/login`. Expired tokens return 401; wrong-purpose or revoked tokens return 403.
 Session-store failures deny access with 500.
+
+Signup, login, and refresh require a nonblank `device_token`. Missing, null,
+empty, or whitespace-only identifiers return 400 without changing the existing
+session. Android clients must send their device identifier on all three calls;
+refresh must send the same identifier used to establish the session.
+
+A valid login or refresh from a different device returns 409 and invalidates the
+existing token pair and device binding. The client must then log in with its
+password and device identifier to establish a new session. Refresh cannot establish
+a new device binding. Legacy sessions without a device identifier are rejected
+with 403 on protected routes and refresh; those users must log in again.
+
+The exact stored access token, including its random token ID, acts as the revocable
+session credential, so a separate session-version field or database migration is
+not required. The device identifier is supplied by the client and is not proof of
+hardware identity: a stolen access token is still a bearer credential until it is
+replaced or expires.
 
 Deploying token-purpose validation invalidates all previously issued tokens without
 `token_use`; existing users must log in again. No database migration or new index is

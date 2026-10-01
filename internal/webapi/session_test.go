@@ -55,6 +55,12 @@ func (s *sessionStore) GetUserByUsername(_ context.Context, username string) (us
 	return s.user, nil
 }
 
+func (s *sessionStore) NewUser(_ context.Context, user users.User) (users.User, error) {
+	user.ID = id.NewID()
+	s.user = user
+	return user, nil
+}
+
 func (s *sessionStore) UpdateTokens(_ context.Context, _ id.ID, access, refresh, device *string) error {
 	if access != nil {
 		s.user.Auth.Token = *access
@@ -105,9 +111,11 @@ func newSessionApp(t *testing.T) *sessionApp {
 	probe := &sessionProbe{}
 	log := logrus.New()
 	log.SetOutput(io.Discard)
+	authRouter := auth.NewMux(store, clock, j)
+	authRouter.SetPasswordHashCost(bcrypt.MinCost)
 	e := webapi.NewEcho("", validator.New(), j, store, webapi.EchoRouters{
 		Swagger:    func(c echo.Context) error { return c.NoContent(204) },
-		AuthRouter: auth.NewMux(store, clock, j), MeRouter: probe,
+		AuthRouter: authRouter, MeRouter: probe,
 	}, log, false)
 	return &sessionApp{e, clock, store, probe}
 }
@@ -132,6 +140,14 @@ func TestProtectedRoutesRequireCurrentAccessToken(t *testing.T) {
 	}{
 		{"current access", func(a *sessionApp) string { return a.store.user.Auth.Token }, 204, 1},
 		{"refresh bearer", func(a *sessionApp) string { return a.store.user.Auth.RefreshToken }, 403, 0},
+		{"refresh bearer after one day", func(a *sessionApp) string {
+			a.clock.now = a.clock.now.Add(24 * time.Hour)
+			return a.store.user.Auth.RefreshToken
+		}, 403, 0},
+		{"blank device binding", func(a *sessionApp) string {
+			a.store.user.Auth.DeviceToken = " \t\n"
+			return a.store.user.Auth.Token
+		}, 403, 1},
 		{"missing bearer", func(a *sessionApp) string { return "" }, 403, 0},
 		{"malformed bearer", func(a *sessionApp) string { return "invalid" }, 403, 0},
 		{"expired access", func(a *sessionApp) string {
@@ -188,7 +204,7 @@ func TestRefreshRejectsAccessAndLegacyTokens(t *testing.T) {
 			}
 			// Matching stored credentials must not bypass token-purpose validation.
 			a.store.user.Auth.Token, a.store.user.Auth.RefreshToken = token, token
-			res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+token+`"}`)
+			res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+token+`","device_token":"device-a"}`)
 			if res.Code != 403 || a.store.reads != 0 {
 				t.Fatalf("refresh status = %d, reads = %d", res.Code, a.store.reads)
 			}
@@ -203,7 +219,7 @@ func TestRefreshRejectsAccessAndLegacyTokens(t *testing.T) {
 }
 
 func TestTokenReplacementRevokesPreviousSession(t *testing.T) {
-	for _, action := range []string{"refresh", "login", "device conflict"} {
+	for _, action := range []string{"refresh", "login", "device conflict", "login device conflict"} {
 		t.Run(action, func(t *testing.T) {
 			a := newSessionApp(t)
 			oldAccess, oldRefresh := a.store.user.Auth.Token, a.store.user.Auth.RefreshToken
@@ -216,6 +232,10 @@ func TestTokenReplacementRevokesPreviousSession(t *testing.T) {
 			if action == "login" {
 				path = "/auth/login"
 				body = `{"username":"alice","password":"test-password","device_token":"device-a"}`
+			} else if action == "login device conflict" {
+				path = "/auth/login"
+				body = `{"username":"alice","password":"test-password","device_token":"device-b"}`
+				wantCode = 409
 			} else if action == "device conflict" {
 				body = `{"refresh_token":"` + oldRefresh + `","device_token":"device-b"}`
 				wantCode = 409
@@ -232,10 +252,10 @@ func TestTokenReplacementRevokesPreviousSession(t *testing.T) {
 					t.Fatalf("revoked or refresh bearer status = %d", res.Code)
 				}
 			}
-			if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+oldRefresh+`"}`); res.Code != 403 {
+			if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+oldRefresh+`","device_token":"device-a"}`); res.Code != 403 {
 				t.Fatalf("old refresh status = %d", res.Code)
 			}
-			if action != "device conflict" {
+			if wantCode == 200 {
 				var pair struct {
 					Access  string `json:"token"`
 					Refresh string `json:"refresh_token"`
@@ -254,16 +274,91 @@ func TestTokenReplacementRevokesPreviousSession(t *testing.T) {
 	}
 }
 
+func TestAuthRequiresDeviceTokenWithoutChangingSession(t *testing.T) {
+	for _, path := range []string{"/auth/signup", "/auth/login", "/auth/refresh"} {
+		for _, device := range []struct {
+			name  string
+			value any
+		}{
+			{name: "omitted"},
+			{name: "null"},
+			{name: "empty", value: ""},
+			{name: "whitespace", value: " \t\r\n"},
+		} {
+			t.Run(path+"/"+device.name, func(t *testing.T) {
+				a := newSessionApp(t)
+				before := a.store.user.Auth
+				body := map[string]any{
+					"username": "alice", "password": "test-password", "refresh_token": before.RefreshToken,
+				}
+				if device.name != "omitted" {
+					body["device_token"] = device.value
+				}
+				encoded, err := json.Marshal(body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				res := a.request(http.MethodPost, path, "", string(encoded))
+				if res.Code != http.StatusBadRequest {
+					t.Fatalf("status = %d, want 400", res.Code)
+				}
+				if a.store.user.Auth != before {
+					t.Fatal("invalid auth request changed the existing session")
+				}
+			})
+		}
+	}
+}
+
+func TestUnboundSessionRequiresPasswordLogin(t *testing.T) {
+	a := newSessionApp(t)
+	a.store.user.Auth.DeviceToken = ""
+	oldAccess, oldRefresh := a.store.user.Auth.Token, a.store.user.Auth.RefreshToken
+	if res := a.request(http.MethodGet, "/me/probe", oldAccess, ""); res.Code != http.StatusForbidden {
+		t.Fatalf("unbound access status = %d, want 403", res.Code)
+	}
+	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+oldRefresh+`","device_token":"device-b"}`); res.Code != http.StatusForbidden {
+		t.Fatalf("unbound refresh status = %d, want 403", res.Code)
+	}
+	if a.store.user.Auth.DeviceToken != "" || a.store.user.Auth.RefreshToken != oldRefresh {
+		t.Fatal("refresh must not bind an unbound session")
+	}
+	res := a.request(http.MethodPost, "/auth/login", "", `{"username":"alice","password":"test-password","device_token":"device-b"}`)
+	if res.Code != http.StatusOK || a.store.user.Auth.DeviceToken != "device-b" {
+		t.Fatalf("password login did not bind the new session: status %d", res.Code)
+	}
+	if res := a.request(http.MethodGet, "/me/probe", a.store.user.Auth.Token, ""); res.Code != http.StatusNoContent {
+		t.Fatalf("bound access status = %d, want 204", res.Code)
+	}
+	if res := a.request(http.MethodGet, "/me/probe", oldAccess, ""); res.Code != http.StatusForbidden {
+		t.Fatalf("old access status = %d, want 403", res.Code)
+	}
+	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+oldRefresh+`","device_token":"device-b"}`); res.Code != http.StatusForbidden {
+		t.Fatalf("old refresh status = %d, want 403", res.Code)
+	}
+}
+
+func TestSignupBindsDevice(t *testing.T) {
+	a := newSessionApp(t)
+	res := a.request(http.MethodPost, "/auth/signup", "", `{"username":"bob","password":"test-password","device_token":"device-b"}`)
+	if res.Code != http.StatusOK || a.store.user.Auth.DeviceToken != "device-b" {
+		t.Fatalf("signup did not bind device: status %d", res.Code)
+	}
+	if res := a.request(http.MethodGet, "/me/probe", a.store.user.Auth.Token, ""); res.Code != http.StatusNoContent {
+		t.Fatalf("signup access status = %d, want 204", res.Code)
+	}
+}
+
 func TestRefreshLifetimeAndExpiration(t *testing.T) {
 	a := newSessionApp(t)
 	refresh := a.store.user.Auth.RefreshToken
 	a.clock.now = a.clock.now.Add(15 * time.Minute)
-	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+refresh+`"}`); res.Code != 200 {
+	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+refresh+`","device_token":"device-a"}`); res.Code != 200 {
 		t.Fatalf("refresh after access expiration status = %d", res.Code)
 	}
 	refresh = a.store.user.Auth.RefreshToken
 	a.clock.now = a.clock.now.Add(720 * time.Hour)
-	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+refresh+`"}`); res.Code != 401 {
+	if res := a.request(http.MethodPost, "/auth/refresh", "", `{"refresh_token":"`+refresh+`","device_token":"device-a"}`); res.Code != 401 {
 		t.Fatalf("expired refresh status = %d", res.Code)
 	}
 }

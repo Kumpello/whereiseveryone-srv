@@ -120,7 +120,10 @@ func NewEcho(
 				log.WithError(err).Error("check authenticated session")
 				return c.String(http.StatusInternalServerError, "internal error")
 			}
-			if subtle.ConstantTimeCompare([]byte(user.Auth.Token), []byte(signed)) != 1 {
+			// The exact stored token is the revocable session credential. Its random
+			// token ID makes replacements distinct even within the same second.
+			if strings.TrimSpace(user.Auth.DeviceToken) == "" ||
+				subtle.ConstantTimeCompare([]byte(user.Auth.Token), []byte(signed)) != 1 {
 				return c.String(http.StatusForbidden, "invalid session")
 			}
 			c.Set("user", v)
