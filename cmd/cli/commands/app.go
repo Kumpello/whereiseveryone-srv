@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"github.com/spf13/cobra"
+	"whereiseveryone/internal/config"
 	"whereiseveryone/internal/mongo"
 	"whereiseveryone/pkg/env"
 	"whereiseveryone/pkg/logger"
@@ -56,6 +57,24 @@ func NewCommandApp(
 
 	rootCmd.AddCommand(dummyCmd)
 	rootCmd.AddCommand(mongoIndexes)
+	initConfig := &cobra.Command{
+		Use:   "initConfig",
+		Short: "Create a private configuration with a fresh JWT secret",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			templatePath, err := cmd.Flags().GetString("template")
+			if err != nil {
+				return err
+			}
+			outputPath, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			return config.CreateFromTemplate(templatePath, outputPath)
+		},
+	}
+	initConfig.Flags().String("template", "./.env/local.example.json", "configuration template path")
+	rootCmd.AddCommand(initConfig)
 
 	return app
 }

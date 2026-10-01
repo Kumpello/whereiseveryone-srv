@@ -1,0 +1,9 @@
+{
+  "app.jwtSecret": "REPLACE_WITH_A_RANDOM_SECRET_GENERATED_FOR_THIS_ENVIRONMENT",
+  "app.debug": "false",
+  "app.port": "8080",
+  "mongo.useCloud": "true",
+  "mongo.uri": "REPLACE_WITH_ATLAS_HOSTNAME",
+  "mongo.x509": ".env/X509-cert.pem",
+  "mongo.db": "whereiseveryone"
+}

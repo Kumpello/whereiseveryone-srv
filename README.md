@@ -8,14 +8,45 @@ It's a standard go app. You can run it using `go run` etc.
 
 App uses json-config. The config MUST be a JSON with **only string** entries.
 As a default `./.env/local.json` is used. You can override it with a flag `--config=$filePath`
+
+Only templates (`.env/*.example.json`) are checked in. Create the configuration you
+need with a fresh JWT signing secret:
+
+```sh
+go run ./cmd/cli initConfig --template=./.env/local.example.json --config=./.env/local.json
+# For separate cloud or Docker environments, generate independently:
+go run ./cmd/cli initConfig --template=./.env/cloud.example.json --config=./.env/cloud.json
+go run ./cmd/cli initConfig --template=./.env/docker.example.json --config=./.env/docker.json
+```
+
+Each invocation generates 32 cryptographically random bytes encoded as base64,
+writes a private file (mode `0600`), and refuses to overwrite an existing path.
+Fill in the database user/password or Atlas hostname and certificate path before
+starting the server. The command does not provision MongoDB accounts. Keep a
+different signing secret for each environment; replicas of the same environment
+must share its secret. Generated configuration and certificates are Git-ignored.
+
+Startup rejects missing, blank, shorter-than-32-byte, and template JWT secrets,
+as well as secrets with surrounding whitespace, before connecting to MongoDB.
+The old committed 13-byte secret is rejected. Length checks cannot establish
+randomness: use the generator or a secret manager with an equivalent random key.
+
+For an existing deployment, generate a new configuration at a new private path,
+apply its deployment-specific settings, then switch the deployment to it. Rotate
+any copy of the previously committed signing secret: it remains exposed in Git
+history. Rotation invalidates existing access and refresh tokens, so users must
+log in again. For Compose, provide an ignored `secrets.env` with MongoDB credentials
+matching `.env/docker.json`.
+
 Optional performance-related config:
 
 * `app.bcryptCost` - bcrypt work factor for new password hashes. Defaults to `14`.
 
 ## Docker - srv
 
-To build a image locally run: `docker build -t whereiseveryone-srv:latest -f docker/Dockerfile .` in project root.
-The command will build the container and will append local `./.env` directory. It can be overwritten later.
+To build an image locally run: `docker build -t whereiseveryone-srv:latest .` in project root.
+Runtime configuration is excluded from both production and debug images. Mount
+the private `.env` directory read-only at runtime; this is also required for `Dockerfile.debug`.
 
 If you want to use local-running mongo (see section `Development/Mongo` below) in docker a network must be created at
 first.
@@ -31,7 +62,7 @@ Then, to run an image:
 docker run \
     -p 127.0.0.1:8080:8080/tcp \
     --network=whereiseveryone-net \
-    -v "`pwd`/.env:/app/.env" \
+    -v "`pwd`/.env:/app/.env:ro" \
     whereiseveryone-srv \
     /bin/sh -c "/app/app-srv --config=/app/.env/docker.json"
 ```
@@ -51,7 +82,7 @@ commands, like db-management. To use it:
 ```
 docker run \
     --network=whereiseveryone-net \
-    -v "`pwd`/.env:/app/.env" \
+    -v "`pwd`/.env:/app/.env:ro" \
     whereiseveryone-srv \
     /bin/sh -c "/app/app-cli --config=/app/.env/docker.json <command>"
 ```
@@ -130,12 +161,13 @@ This command will run the mongodb container with root user: `root:password123` o
 To see a list of available config keys please see `/internal/config/dict.go`.
 For local development use `./.env/local.json` file.
 
-_To replace a config you need to edit main.go files to point a proper one_
+Select another configuration with `--config=path/to/private.json`.
 
 ## Using cloud db
 
 At first, you need to generate a X509 certificate from Mongo Atlas. **Keep it secret!**
-Put it in `.env` directory and then use a config from `./.env/cloud.json`
+Put it in `.env` and generate `./.env/cloud.json` from the cloud template using
+`initConfig` above. Set the Atlas hostname and certificate path in the generated file.
 
 # Documentation
 

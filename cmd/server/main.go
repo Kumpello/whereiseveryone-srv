@@ -69,6 +69,11 @@ func main() {
 		log.Fatalf("loading config: %s", err.Error())
 	}
 
+	jwtSecret, err := config.JWTSecret(envHandler)
+	if err != nil {
+		log.Fatalf("invalid configuration: %s", err)
+	}
+
 	isDebug := envHandler.MustEnv(config.ConfDebug) == "true"
 	if isDebug {
 		log.SetLevel(logrus.DebugLevel)
@@ -92,8 +97,6 @@ func main() {
 	cancelIndexCreation()
 
 	// Echo
-	jwtSecret := envHandler.MustEnv(config.ConfJwtSecret)
-	// TODO: Get VALIDITY from config
 	jwtInstance := jwt.NewJWT(utcTimer, []byte(jwtSecret), time.Duration(15)*time.Minute, time.Duration(720)*time.Hour)
 
 	authRouter := authMux.NewMux(usersAdapter, utcTimer, jwtInstance)
