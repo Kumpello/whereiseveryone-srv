@@ -51,7 +51,9 @@ func newRequestLimitApp(t *testing.T) (*sessionApp, *requestLimitStore) {
 	store := &requestLimitStore{sessionStore: a.store}
 	j := jwt.NewJWT(a.clock, []byte("session-test-secret"), 15*time.Minute, 720*time.Hour)
 	authRouter := auth.NewMux(store, a.clock, j)
-	authRouter.SetPasswordHashCost(bcrypt.MinCost)
+	if err := authRouter.SetPasswordHashCost(bcrypt.MinCost); err != nil {
+		t.Fatal(err)
+	}
 	log := logrus.New()
 	log.SetOutput(io.Discard)
 	a.echo = webapi.NewEcho("", validator.New(), j, store, webapi.EchoRouters{

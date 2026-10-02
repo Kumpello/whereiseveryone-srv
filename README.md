@@ -172,6 +172,38 @@ Deploying token-purpose validation invalidates all previously issued tokens with
 `token_use`; existing users must log in again. No database migration or new index is
 required. Protected requests now require an available MongoDB session lookup.
 
+## Authentication abuse protection
+
+Login returns the same HTTP 403 JSON response for unknown usernames and incorrect
+passwords. Both perform bcrypt verification; malformed stored hashes also perform
+dummy verification. The dummy hash uses `app.bcryptCost`. Lower-cost legacy hashes
+perform additional dummy work to reach that cost's total bcrypt round count. Keep
+the configured cost at least as high as existing hashes to avoid timing differences
+from higher-cost legacy hashes; those hashes remain usable.
+
+Attempts use fixed windows starting with the first attempt:
+
+| Route | Per source | Per exact username | Across the instance |
+| --- | --- | --- | --- |
+| `/auth/login` | 30 / 5 minutes | 10 / 15 minutes | Bounded admission |
+| `/auth/signup` | 5 / hour | 3 / hour | 100 / hour |
+
+Source and global quotas run before binding, including invalid requests. Username
+quotas run after validation and include successful and failed attempts at existing
+and nonexistent accounts; success does not reset them. Both routes share up to
+`min(GOMAXPROCS, 8)` admitted requests, held through lookup, bcrypt, and persistence.
+There is no waiting queue. Saturation or an exhausted quota returns generic HTTP
+429 with `Retry-After` in seconds (one second for admission saturation).
+
+Sources use the socket peer address and ignore forwarding headers. IPv4-mapped
+addresses share the IPv4 budget; IPv6 addresses share a `/64` budget. Behind a
+reverse proxy, requests share the proxy peer's budget, so enforce client-specific
+limits at the trusted gateway. Limiter storage holds at most 10,000 hashed keys,
+expires entries, and rejects new keys when full without evicting active budgets.
+Limits are in memory per server instance and reset on restart; multiple replicas
+require coordinated limits at the gateway or a shared limiter for deployment-wide
+quotas. No configuration keys, database migrations, or indexes are added.
+
 # Development
 
 To run app in development, at first run MongoDB docker container:

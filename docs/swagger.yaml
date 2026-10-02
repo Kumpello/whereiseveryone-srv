@@ -174,7 +174,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: logs in as an exiting users using login and passowrd
+      description: invalid usernames and passwords return the same 403 response after
+        bcrypt verification
       parameters:
       - description: login details
         in: body
@@ -192,11 +193,7 @@ paths:
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "403":
-          description: forbidden (invalid password)
-          schema:
-            $ref: '#/definitions/jsonerr.JSONError'
-        "404":
-          description: user not exists
+          description: forbidden (invalid credentials)
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "409":
@@ -211,6 +208,10 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "415":
           description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: too many requests; see Retry-After
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
@@ -307,6 +308,10 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "415":
           description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: too many requests; see Retry-After
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":

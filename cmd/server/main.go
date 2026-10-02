@@ -98,7 +98,9 @@ func main() {
 	jwtInstance := jwt.NewJWT(utcTimer, []byte(jwtSecret), time.Duration(15)*time.Minute, time.Duration(720)*time.Hour)
 
 	authRouter := authMux.NewMux(usersAdapter, utcTimer, jwtInstance)
-	authRouter.SetPasswordHashCost(bcryptCostFromEnv(envHandler, log))
+	if err := authRouter.SetPasswordHashCost(bcryptCostFromEnv(envHandler, log)); err != nil {
+		log.Fatalf("configure authentication: %s", err)
+	}
 	meRouter := meMux.NewMux(usersAdapter, utcTimer)
 
 	validate := validator.New()

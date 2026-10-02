@@ -155,7 +155,9 @@ func newSessionApp(t *testing.T) *sessionApp {
 	log := logrus.New()
 	log.SetOutput(io.Discard)
 	authRouter := auth.NewMux(store, clock, j)
-	authRouter.SetPasswordHashCost(bcrypt.MinCost)
+	if err := authRouter.SetPasswordHashCost(bcrypt.MinCost); err != nil {
+		t.Fatal(err)
+	}
 	e := webapi.NewEcho("", validator.New(), j, store, webapi.EchoRouters{
 		Swagger:    func(c *echo.Context) error { return c.NoContent(204) },
 		AuthRouter: authRouter, MeRouter: probe,

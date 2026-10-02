@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
@@ -17,17 +18,28 @@ import (
 	"whereiseveryone/pkg/timer"
 
 	"github.com/labstack/echo/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
-const authRequestTimeout = 15 * time.Second
+const (
+	authRequestTimeout    = 15 * time.Second
+	maxPasswordOperations = 8
+	// This is a valid cost-14 bcrypt hash used only for dummy verification.
+	// Matching it never authenticates a nonexistent account.
+	//nolint:gosec // A public dummy hash cannot authenticate any account.
+	defaultDummyPasswordHash = "$2a$14$G8Qact67wFEE9JCjAMkKHOKnJSMPnwTdFeFbVdf4.B198SVoWY5im"
+)
 
 type mux struct {
 	userAdapter users.Adapter
 	timer       timer.Timer
 	jwt         *jwt.JWT
 
-	passwordHashCost int
-	passwordOps      chan struct{}
+	passwordHashCost  int
+	passwordOps       chan struct{}
+	dummyPasswordHash string
+	verifyPassword    func(string, string) error
+	throttle          *authThrottle
 }
 
 func NewMux(
@@ -39,34 +51,82 @@ func NewMux(
 	if passwordOpsLimit < 1 {
 		passwordOpsLimit = 1
 	}
+	if passwordOpsLimit > maxPasswordOperations {
+		passwordOpsLimit = maxPasswordOperations
+	}
 
 	return &mux{
-		userAdapter:      userAdapter,
-		timer:            timer,
-		jwt:              jwt,
-		passwordHashCost: crypto.DefaultPasswordHashCost,
-		passwordOps:      make(chan struct{}, passwordOpsLimit),
+		userAdapter:       userAdapter,
+		timer:             timer,
+		jwt:               jwt,
+		passwordHashCost:  crypto.DefaultPasswordHashCost,
+		passwordOps:       make(chan struct{}, passwordOpsLimit),
+		dummyPasswordHash: defaultDummyPasswordHash,
+		verifyPassword:    crypto.VerifyPassword,
+		throttle:          newAuthThrottle(),
 	}
 }
 
-func (m *mux) SetPasswordHashCost(cost int) {
+// SetPasswordHashCost prepares a matching dummy hash before serving requests.
+func (m *mux) SetPasswordHashCost(cost int) error {
+	if cost < bcrypt.MinCost || cost > bcrypt.MaxCost {
+		return errors.New("invalid bcrypt cost")
+	}
+	if cost == m.passwordHashCost {
+		return nil
+	}
+	hash, err := crypto.HashPasswordWithCost("dummy-password-never-authenticates", cost)
+	if err != nil {
+		return fmt.Errorf("prepare dummy password hash: %w", err)
+	}
 	m.passwordHashCost = cost
+	m.dummyPasswordHash = hash
+	return nil
 }
 
-func (m *mux) acquirePasswordSlot(ctx context.Context) (func(), error) {
+func (m *mux) acquirePasswordSlot(ctx context.Context) (func(), bool) {
+	if ctx.Err() != nil {
+		return nil, false
+	}
 	select {
 	case m.passwordOps <- struct{}{}:
 		return func() {
 			<-m.passwordOps
-		}, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
+		}, true
+	default:
+		return nil, false
 	}
 }
 
+// verifyLoginPassword never skips bcrypt for an unknown or malformed account.
+// Lower-cost legacy hashes are padded to the configured bcrypt work factor.
+func (m *mux) verifyLoginPassword(hash, password string, found bool) bool {
+	cost, hashErr := bcrypt.Cost([]byte(hash))
+	if !found || hashErr != nil {
+		hash, cost, found = m.dummyPasswordHash, m.passwordHashCost, false
+	}
+	passwordErr := m.verifyPassword(hash, password)
+	if passwordErr != nil && !errors.Is(passwordErr, bcrypt.ErrMismatchedHashAndPassword) {
+		// A valid cost header may still contain a malformed salt or digest.
+		passwordErr = m.verifyPassword(m.dummyPasswordHash, password)
+		cost, found = m.passwordHashCost, false
+	}
+	// Bcrypt cost c performs 2^c rounds. Adding dummy work at c, c+1, ...,
+	// target-1 raises a lower-cost verification to the same total round count.
+	for paddingCost := cost; paddingCost < m.passwordHashCost; paddingCost++ {
+		dummy := m.dummyPasswordHash[:4] + fmt.Sprintf("%02d", paddingCost) + m.dummyPasswordHash[6:]
+		// These valid encodings need not match a password: their digest is never
+		// used to authenticate an account, only to perform the padding work.
+		if err := m.verifyPassword(dummy, password); err != nil && !errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			found = false
+		}
+	}
+	return found && passwordErr == nil
+}
+
 func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
-	g.POST("/signup", m.signUp, webapi.RequireJSON)
-	g.POST("/login", m.logIn, webapi.RequireJSON)
+	g.POST("/signup", m.signUp, m.throttleSource(true), webapi.RequireJSON)
+	g.POST("/login", m.logIn, m.throttleSource(false), webapi.RequireJSON)
 	g.POST("/refresh", m.refreshToken, webapi.RequireJSON)
 }
 
@@ -103,6 +163,7 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 // @param userDetails body signUpRequest true "sign up details"
 // @success 200 {object} authResponse
 // @failure 400 {object} jsonerr.JSONError "invalid request"
+// @failure 429 {object} jsonerr.JSONError "too many requests; see Retry-After"
 // @failure 409 {object} jsonerr.JSONError "conflict (user with such a name exists)
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/signup [POST]
@@ -125,12 +186,16 @@ func (m *mux) signUp(c *echo.Context) error {
 		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
 	}
 
-	releasePasswordSlot, err := m.acquirePasswordSlot(reqCtx)
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
+	q := newQuota(signupAccount, request.Username, signupAccountLimit, time.Hour)
+	if retry := m.throttle.allow(m.timer.Now(), q); retry > 0 {
+		return tooManyRequests(c, retry)
 	}
+	releasePasswordSlot, admitted := m.acquirePasswordSlot(reqCtx)
+	if !admitted {
+		return tooManyRequests(c, time.Second)
+	}
+	defer releasePasswordSlot()
 	encPass, err := crypto.HashPasswordWithCost(request.Password, m.passwordHashCost)
-	releasePasswordSlot()
 	if err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
 	}
@@ -175,7 +240,7 @@ func (m *mux) signUp(c *echo.Context) error {
 // logIn
 //
 // @summary log in
-// @description logs in as an exiting users using login and passowrd
+// @description invalid usernames and passwords return the same 403 response after bcrypt verification
 // @tags auth
 // @accept json
 // @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
@@ -184,8 +249,8 @@ func (m *mux) signUp(c *echo.Context) error {
 // @param userDetails body logInRequest true "login details"
 // @success 200 {object} authResponse
 // @failure 400 {object} jsonerr.JSONError "invalid request"
-// @failure 403 {object} jsonerr.JSONError "forbidden (invalid password)"
-// @failure 404 {object} jsonerr.JSONError "user not exists"
+// @failure 403 {object} jsonerr.JSONError "forbidden (invalid credentials)"
+// @failure 429 {object} jsonerr.JSONError "too many requests; see Retry-After"
 // @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/login [POST]
@@ -208,21 +273,22 @@ func (m *mux) logIn(c *echo.Context) error {
 		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
 	}
 
-	u, err := m.userAdapter.GetUserByUsername(reqCtx, request.Username)
-	if err != nil {
-		if errors.Is(err, users.ErrUserNotExists) {
-			return jsonerr.EchoNotFoundError(err).Echo(c)
-		}
-		return jsonerr.EchoInternalError(err).Echo(c)
+	q := newQuota(loginAccount, request.Username, loginAccountLimit, 15*time.Minute)
+	if retry := m.throttle.allow(m.timer.Now(), q); retry > 0 {
+		return tooManyRequests(c, retry)
 	}
+	releasePasswordSlot, admitted := m.acquirePasswordSlot(reqCtx)
+	if !admitted {
+		return tooManyRequests(c, time.Second)
+	}
+	defer releasePasswordSlot()
 
-	releasePasswordSlot, err := m.acquirePasswordSlot(reqCtx)
-	if err != nil {
+	u, err := m.userAdapter.GetUserByUsername(reqCtx, request.Username)
+	found := err == nil
+	if err != nil && !errors.Is(err, users.ErrUserNotExists) {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
-	err = crypto.VerifyPassword(u.Auth.Password, request.Password)
-	releasePasswordSlot()
-	if err != nil {
+	if !m.verifyLoginPassword(u.Auth.Password, request.Password, found) {
 		return jsonerr.EchoForbiddenError().Echo(c)
 	}
 

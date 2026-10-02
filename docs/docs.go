@@ -21,7 +21,7 @@ const docTemplate = `{
     "paths": {
         "/auth/login": {
             "post": {
-                "description": "logs in as an exiting users using login and passowrd",
+                "description": "invalid usernames and passwords return the same 403 response after bcrypt verification",
                 "consumes": [
                     "application/json"
                 ],
@@ -54,13 +54,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "forbidden (invalid password)",
-                        "schema": {
-                            "$ref": "#/definitions/jsonerr.JSONError"
-                        }
-                    },
-                    "404": {
-                        "description": "user not exists",
+                        "description": "forbidden (invalid credentials)",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -82,6 +76,12 @@ const docTemplate = `{
                     },
                     "415": {
                         "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "too many requests; see Retry-After",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -225,6 +225,12 @@ const docTemplate = `{
                     },
                     "415": {
                         "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "too many requests; see Retry-After",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
