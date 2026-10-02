@@ -23,10 +23,11 @@ func MakeEchoLogEntry(logger Logger, c *echo.Context) *logrus.Entry {
 	}
 
 	return logger.WithFields(logrus.Fields{
-		"at":     time.Now().Format("2006-01-02 15:04:05"),
-		"method": c.Request().Method,
-		"path":   c.Path(),
-		"uri":    c.Request().RequestURI,
-		"ip":     c.RealIP(),
+		"at":             time.Now().Format("2006-01-02 15:04:05"),
+		"method":         c.Request().Method,
+		"path":           c.Path(),
+		"uri":            c.Request().RequestURI,
+		"ip":             c.RealIP(),
+		"correlation_id": c.Response().Header().Get(echo.HeaderXRequestID),
 	})
 }

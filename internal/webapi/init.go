@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo/v5/middleware"
-
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/id"
@@ -78,12 +76,12 @@ func NewEcho(
 	sessions SessionReader,
 	routers EchoRouters,
 	log logger.Logger,
-	debug bool,
+	_ bool, // Debug mode never changes public errors or disables correlated logging.
 ) *echo.Echo {
 	e := echo.New()
-	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(debug)
+	e.HTTPErrorHandler = publicHTTPErrorHandler
 	e.Validator = &echoValidator{validator: validate}
-	e.Pre(limitRequestBody)
+	e.Pre(requestCorrelation, requestLogger(log), limitRequestBody)
 
 	authMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -118,8 +116,7 @@ func NewEcho(
 				if errors.Is(err, users.ErrUserNotExists) {
 					return c.String(http.StatusForbidden, "invalid session")
 				}
-				log.WithError(err).Error("check authenticated session")
-				return c.String(http.StatusInternalServerError, "internal error")
+				return jsonerr.EchoInternalError(err).Echo(c)
 			}
 			// Refresh preserves the previous access token for a bounded grace period.
 			if strings.TrimSpace(user.Auth.DeviceToken) == "" ||
@@ -144,27 +141,6 @@ func NewEcho(
 	e.GET("health", func(c *echo.Context) error {
 		return c.JSON(200, "ok")
 	})
-
-	if debug {
-		e.Use(middleware.RequestLogger())
-	} else {
-		e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-			HandleError: true,
-			LogStatus:   true,
-			LogLatency:  true,
-			LogValuesFunc: func(c *echo.Context, values middleware.RequestLoggerValues) error {
-				entry := logger.MakeEchoLogEntry(log, c).
-					WithField("status", values.Status).
-					WithField("latency", values.Latency.String())
-				if values.Error != nil {
-					entry.WithError(values.Error).Warn("request failed")
-				} else {
-					entry.Info("request completed")
-				}
-				return nil
-			},
-		}))
-	}
 
 	return e
 }

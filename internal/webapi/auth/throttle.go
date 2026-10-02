@@ -132,7 +132,8 @@ func tooManyRequests(c *echo.Context, retry time.Duration) error {
 		seconds = 1
 	}
 	c.Response().Header().Set("Retry-After", strconv.FormatInt(int64(seconds), 10))
-	return c.JSON(http.StatusTooManyRequests, jsonerr.EchoError(http.StatusTooManyRequests, "too many requests", nil))
+	//nolint:wrapcheck // Echo handles response-write errors.
+	return jsonerr.EchoError(http.StatusTooManyRequests, "too many requests", nil).Echo(c)
 }
 
 func (m *mux) throttleSource(signup bool) echo.MiddlewareFunc {

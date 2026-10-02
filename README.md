@@ -176,11 +176,20 @@ required. Protected requests now require an available MongoDB session lookup.
 friendships. Incoming and outgoing pending entries omit `status` and `location`;
 accepted friends include `status` even when it is empty.
 
+## Public errors
+
+Internal failures return JSON containing `code`, the generic `message`
+`internal error`, and `correlation_id`. Underlying errors are never serialized,
+including when debug mode is enabled. Every response carries a server-generated
+`X-Request-ID`. It matches the ID in the common JSON error body and in the
+structured request log, where the underlying error is recorded.
+Use this ID when investigating failures. Client-supplied request IDs are ignored.
+
 ## Authentication abuse protection
 
-Login returns the same HTTP 403 JSON response for unknown usernames and incorrect
-passwords. Both perform bcrypt verification; malformed stored hashes also perform
-dummy verification. The dummy hash uses `app.bcryptCost`. Lower-cost legacy hashes
+Login returns the same HTTP 403 code and public message for unknown usernames and
+incorrect passwords, with a unique correlation ID per request. Both perform
+bcrypt verification; malformed stored hashes also perform dummy verification. The dummy hash uses `app.bcryptCost`. Lower-cost legacy hashes
 perform additional dummy work to reach that cost's total bcrypt round count. Keep
 the configured cost at least as high as existing hashes to avoid timing differences
 from higher-cost legacy hashes; those hashes remain usable.

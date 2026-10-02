@@ -911,8 +911,8 @@ const docTemplate = `{
                     "description": "Code is desired http code for this error",
                     "type": "integer"
                 },
-                "error": {
-                    "description": "Err is a golang error returned by the app\nIt is removed in production application (TBD)",
+                "correlation_id": {
+                    "description": "CorrelationID identifies the request in server logs and the X-Request-ID header.",
                     "type": "string"
                 },
                 "message": {

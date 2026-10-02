@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -142,7 +143,20 @@ func TestLoginFailuresHaveIdenticalResponsesAndBcryptWork(t *testing.T) {
 	}
 	known := a.request(t.Context(), "/auth/login", "192.0.2.1:1234", credentials(t, "alice", "wrong"))
 	missing := a.request(t.Context(), "/auth/login", "192.0.2.1:1234", credentials(t, "unknown", "wrong"))
-	if known.Code != http.StatusForbidden || known.Code != missing.Code || known.Body.String() != missing.Body.String() {
+	var knownBody, missingBody map[string]any
+	if err := json.Unmarshal(known.Body.Bytes(), &knownBody); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(missing.Body.Bytes(), &missingBody); err != nil {
+		t.Fatal(err)
+	}
+	if knownBody["correlation_id"] == "" || missingBody["correlation_id"] == "" ||
+		knownBody["correlation_id"] == missingBody["correlation_id"] {
+		t.Fatal("login failures must have distinct correlation IDs")
+	}
+	delete(knownBody, "correlation_id")
+	delete(missingBody, "correlation_id")
+	if known.Code != http.StatusForbidden || known.Code != missing.Code || !reflect.DeepEqual(knownBody, missingBody) {
 		t.Fatalf("login failures differ: known=%d %s, missing=%d %s", known.Code, known.Body.String(), missing.Code, missing.Body.String())
 	}
 	if len(hashes) != 2 || hashes[0] != a.store.accounts["alice"].Auth.Password || hashes[1] != a.m.dummyPasswordHash {
