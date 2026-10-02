@@ -8,8 +8,8 @@ import (
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type Location struct {
@@ -42,7 +42,7 @@ type mongoLocationAdapter struct {
 
 func (l mongoLocationAdapter) UpdateLocation(ctx context.Context, userID id.ID, newLocation Location) error {
 	location := bson.D{
-		bson.E{Key: "location", Value: newLocation},
+		bson.E{Key: locationField, Value: newLocation},
 	}
 
 	filter := withUserId(userID)
@@ -62,7 +62,7 @@ func (l mongoLocationAdapter) WipeLocation(ctx context.Context, userID id.ID) er
 	filter := withUserId(userID)
 	update := bson.M{
 		"$set": bson.M{
-			"location": nil,
+			locationField: nil,
 		},
 	}
 

@@ -15,7 +15,7 @@ import (
 	"whereiseveryone/pkg/jwt"
 	"whereiseveryone/pkg/timer"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const authRequestTimeout = 15 * time.Second
@@ -103,7 +103,7 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 // @failure 409 {object} jsonerr.JSONError "conflict (user with such a name exists)
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/signup [POST]
-func (m *mux) signUp(c echo.Context) error {
+func (m *mux) signUp(c *echo.Context) error {
 	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
 	defer cancel()
 
@@ -180,7 +180,7 @@ func (m *mux) signUp(c echo.Context) error {
 // @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/login [POST]
-func (m *mux) logIn(c echo.Context) error {
+func (m *mux) logIn(c *echo.Context) error {
 	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
 	defer cancel()
 
@@ -254,7 +254,7 @@ func (m *mux) logIn(c echo.Context) error {
 // @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /auth/refresh [POST]
-func (m *mux) refreshToken(c echo.Context) error {
+func (m *mux) refreshToken(c *echo.Context) error {
 	reqCtx, cancel := context.WithTimeout(
 		c.Request().Context(),
 		authRequestTimeout,

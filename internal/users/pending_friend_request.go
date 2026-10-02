@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
-	"whereiseveryone/pkg/pointers"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type PendingFriendRequest struct {
@@ -33,16 +32,14 @@ type mongoPendingFriendRequestAdapter struct {
 }
 
 func (m mongoPendingFriendRequestAdapter) EnsureIndexes(ctx context.Context) error {
-	unique := options.IndexOptions{
-		Unique: pointers.Pointer(true),
-	}
+	unique := options.Index().SetUnique(true)
 
 	uniqueRequestIdx := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "from", Value: 1},
 			{Key: "to", Value: 1},
 		},
-		Options: &unique,
+		Options: unique,
 	}
 	incomingRequestsIdx := mongo.IndexModel{
 		Keys: bson.D{
@@ -145,7 +142,7 @@ func (m mongoPendingFriendRequestAdapter) SendFriendRequest(
 			To:   to,
 		},
 	}
-	opts := options.Update().SetUpsert(true)
+	opts := options.UpdateOne().SetUpsert(true)
 
 	_, err := m.coll.UpdateOne(ctx, filter, update, opts)
 	if err != nil {

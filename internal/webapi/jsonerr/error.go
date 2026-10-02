@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type JSONError struct {
@@ -42,7 +42,8 @@ func (h JSONError) Error() string {
 	return h.Message
 }
 
-func (h JSONError) Echo(context echo.Context) error {
+// Echo writes the JSON error response with its HTTP status.
+func (h JSONError) Echo(context *echo.Context) error {
 	return context.JSON(h.Code, h)
 }
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-playground/validator"
-	"github.com/labstack/echo/v4"
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/echo/v5"
 
 	"whereiseveryone/internal/users"
 	"whereiseveryone/pkg/id"

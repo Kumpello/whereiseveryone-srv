@@ -1,4 +1,4 @@
-FROM golang:1.26.3-alpine AS builder
+FROM golang:1.27.1-alpine AS builder
 
 RUN apk add --no-cache git
 
@@ -14,7 +14,7 @@ COPY . .
 RUN go build -o ./out/app-srv ./cmd/server/main.go
 RUN go build -o ./out/app-cli ./cmd/cli/main.go
 
-FROM alpine:3.20
+FROM alpine:3.24.2
 
 WORKDIR /app
 

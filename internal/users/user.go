@@ -8,12 +8,11 @@ import (
 	"time"
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/logger"
-	"whereiseveryone/pkg/pointers"
 	"whereiseveryone/pkg/timer"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type User struct {
@@ -112,14 +111,12 @@ func NewMongoAdapter(
 }
 
 func (m *mongoUserAdapter) EnsureIndexes(ctx context.Context) error {
-	unique := options.IndexOptions{
-		Unique: pointers.Pointer(true),
-	}
+	unique := options.Index().SetUnique(true)
 	userIDIdx := mongo.IndexModel{
 		Keys: bson.M{
 			"auth.username": 1,
 		},
-		Options: &unique,
+		Options: unique,
 	}
 
 	_, err := m.coll.Indexes().CreateOne(ctx, userIDIdx)
@@ -181,10 +178,10 @@ func (m *mongoUserAdapter) GetUsers(ctx context.Context, ids []id.ID) ([]User, e
 		},
 	}
 	opts := options.Find().SetProjection(bson.M{
-		"auth.username":      1,
-		"location":           1,
-		"status":             1,
-		"paused_users":       1,
+		"auth.username":  1,
+		locationField:    1,
+		"status":         1,
+		pausedUsersField: 1,
 	})
 	c, err := m.coll.Find(ctx, filter, opts)
 	if err != nil {
@@ -385,7 +382,7 @@ func (m *mongoUserAdapter) StopSharing(ctx context.Context, userID id.ID, userTo
 	filter := withUserId(userID)
 	update := bson.M{
 		"$addToSet": bson.M{
-			"paused_users": userToPause,
+			pausedUsersField: userToPause,
 		},
 	}
 
@@ -401,7 +398,7 @@ func (m *mongoUserAdapter) ResumeSharing(ctx context.Context, userID id.ID, user
 	filter := withUserId(userID)
 	update := bson.M{
 		"$pull": bson.M{
-			"paused_users": userToUnpause,
+			pausedUsersField: userToUnpause,
 		},
 	}
 

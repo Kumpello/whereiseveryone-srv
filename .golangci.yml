@@ -3,18 +3,17 @@ version: "2"
 run:
   timeout: 10m
 
+formatters:
+  enable:
+    - gofmt
+
 linters:
   enable:
-    - deadcode
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - structcheck
-    - typecheck
     - unused
-    - varcheck
     - asciicheck
     - bidichk
     - bodyclose
@@ -24,7 +23,6 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forbidigo
     - forcetypeassert
     # TODO: decide about import order and enable the linter
@@ -34,11 +32,9 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
     - gomoddirectives
     - goprintffuncname
     - gosec
-    - ifshort
     # Not full go1.18 support, disable for a while
     # - ireturn
     - lll
@@ -55,7 +51,6 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - tagliatelle
-    - tenv
     - thelper
     - unconvert
     - unparam
@@ -63,11 +58,6 @@ linters:
     - wrapcheck
   exclusions:
     rules:
-      - path: internal/worker/notifier/param.go
-        # TODO: Remove nolint (linter not supports go1.18 features)
-        linters:
-          - typecheck
-
       - path: _test\.go
         linters:
           - dupl
@@ -78,8 +68,7 @@ linters:
           - gochecknoinits
           - goconst
           - gocyclo
-          - goerr113
-          - ifshort
+          - err113
           - ireturn
           - lll
 
@@ -118,9 +107,9 @@ linters:
         - multierr.Combine(
         - (*whereiseveryone/internal/webapi/jsonerr.JSONError).Echo(
         - endpoints.
-        - (github.com/labstack/echo/v4.Context).JSON(
-        - (github.com/labstack/echo/v4.Context).String(
-        - (github.com/labstack/echo/v4.Context).NoContent(
+        - (*github.com/labstack/echo/v5.Context).JSON(
+        - (*github.com/labstack/echo/v5.Context).String(
+        - (*github.com/labstack/echo/v5.Context).NoContent(
 
     revive:
       confidence: 0.8

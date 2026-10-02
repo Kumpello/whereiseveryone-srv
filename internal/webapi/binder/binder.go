@@ -9,7 +9,7 @@ import (
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/jwt"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const requestTimeout = 15 * time.Second
@@ -19,7 +19,7 @@ const requestTimeout = 15 * time.Second
 type BaseContext interface {
 	Context() context.Context
 	Cancel()
-	Echo() echo.Context
+	Echo() *echo.Context
 	UserID() id.ID
 	TokenData() jwt.SignedToken
 }
@@ -27,11 +27,10 @@ type BaseContext interface {
 type EmptyBody struct {
 }
 
-//nolint:structcheck // binder implementation may contain unused items
 type Context[T any] struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	echo   echo.Context
+	echo   *echo.Context
 
 	userID    id.ID
 	tokenData jwt.SignedToken
@@ -49,7 +48,8 @@ func (c Context[T]) Cancel() {
 	c.cancel()
 }
 
-func (c Context[T]) Echo() echo.Context { //nolint:ireturn // nolintlint
+// Echo returns the underlying HTTP request context.
+func (c Context[T]) Echo() *echo.Context {
 	return c.echo
 }
 
@@ -71,7 +71,7 @@ type StructValidator interface {
 // On failure, the returned context is already canceled. On success, the caller
 // owns cancellation and should defer result.Cancel().
 func BindRequest[T any](
-	c echo.Context,
+	c *echo.Context,
 	requireAuth bool,
 ) (*Context[T], *jsonerr.JSONError) {
 	result := &Context[T]{
@@ -88,13 +88,13 @@ func BindRequest[T any](
 		jwtToken, err := webapi.GetJWTToken(c)
 		if err != nil {
 			cancel()
-			c.Logger().Errorf("Failed to get JWT token: %v", err)
+			c.Logger().Error("Failed to get JWT token", "error", err)
 			return result, webapi.JWTErrorToJSONError(err)
 		}
 		requesterID, err := id.FromString(jwtToken.ID)
 		if err != nil {
 			cancel()
-			c.Logger().Errorf("Failed to get requester ID: %v", err)
+			c.Logger().Error("Failed to get requester ID", "error", err)
 			return result, jsonerr.EchoInvalidRequestError(err)
 		}
 		result.userID = requesterID
@@ -104,14 +104,14 @@ func BindRequest[T any](
 	// Obtain request
 	if err := c.Bind(&t); err != nil {
 		cancel()
-		c.Logger().Errorf("Failed to bind request: %v", err)
+		c.Logger().Error("Failed to bind request", "error", err)
 		return result, jsonerr.EchoInvalidRequestError(err)
 	}
 
 	if val := reflect.ValueOf(t); val.Kind() == reflect.Struct { // don't validate interface{} type
 		if err := c.Validate(t); err != nil {
 			cancel()
-			c.Logger().Errorf("Failed to validate request: %v", err)
+			c.Logger().Error("Failed to validate request", "error", err)
 			return result, jsonerr.EchoInvalidRequestError(err)
 		}
 	}

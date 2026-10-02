@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-playground/validator"
-	jwtgo "github.com/golang-jwt/jwt"
-	"github.com/labstack/echo/v4"
+	"github.com/go-playground/validator/v10"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"whereiseveryone/internal/users"
@@ -119,7 +119,7 @@ func (s *sessionStore) ReplaceTokens(_ context.Context, userID id.ID, previous u
 type sessionProbe struct{ calls int }
 
 func (p *sessionProbe) Route(g *echo.Group, _ echo.MiddlewareFunc) {
-	g.GET("/probe", func(c echo.Context) error {
+	g.GET("/probe", func(c *echo.Context) error {
 		p.calls++
 		if _, err := webapi.GetJWTToken(c); err != nil {
 			return err
@@ -157,7 +157,7 @@ func newSessionApp(t *testing.T) *sessionApp {
 	authRouter := auth.NewMux(store, clock, j)
 	authRouter.SetPasswordHashCost(bcrypt.MinCost)
 	e := webapi.NewEcho("", validator.New(), j, store, webapi.EchoRouters{
-		Swagger:    func(c echo.Context) error { return c.NoContent(204) },
+		Swagger:    func(c *echo.Context) error { return c.NoContent(204) },
 		AuthRouter: authRouter, MeRouter: probe,
 	}, log, false)
 	return &sessionApp{e, clock, store, probe}

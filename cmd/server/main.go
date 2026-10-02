@@ -10,7 +10,7 @@ import (
 	"whereiseveryone/internal/config"
 
 	"github.com/sirupsen/logrus"
-	echoSwagger "github.com/swaggo/echo-swagger"
+	echoSwagger "github.com/swaggo/echo-swagger/v2"
 	"golang.org/x/crypto/bcrypt"
 
 	"whereiseveryone/internal/mongo"
@@ -24,11 +24,9 @@ import (
 	"whereiseveryone/pkg/logger"
 	"whereiseveryone/pkg/timer"
 
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 
 	_ "whereiseveryone/docs"
-
-	_ "github.com/swaggo/echo-swagger" // echo-swagger middleware
 )
 
 const (
@@ -121,11 +119,12 @@ func main() {
 	port := envHandler.MustEnv(config.ConfAppPort)
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
+		Handler:      e,
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
 		IdleTimeout:  serverIdleTimeout,
 	}
-	log.Fatal(e.StartServer(srv))
+	log.Fatal(srv.ListenAndServe())
 }
 
 func intFromEnv(envHandler env.Handler, key env.Key, fallback int, log logger.Logger) int {

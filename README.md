@@ -4,6 +4,12 @@
 
 It's a standard go app. You can run it using `go run` etc.
 
+Use Go 1.27.1 and MongoDB 4.4 or newer (required by MongoDB driver v2).
+The application uses Echo v5, validator v10, and JWT v5; existing JWT and
+database ID formats are preserved. Swagger's transitive `github.com/sv-tools/openapi`
+dependency stays on v0.4.0 because its v1 releases removed the `spec` package
+required by `swag/v2`.
+
 ## Config
 
 App uses json-config. The config MUST be a JSON with **only string** entries.

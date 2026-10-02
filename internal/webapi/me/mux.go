@@ -9,7 +9,7 @@ import (
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/timer"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type mux struct {
@@ -48,7 +48,7 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/status [PUT]
-func (m *mux) updateStatus(c echo.Context) error {
+func (m *mux) updateStatus(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[updateStatusRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -76,7 +76,7 @@ func (m *mux) updateStatus(c echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friends [GET]
-func (m *mux) getFriends(c echo.Context) error {
+func (m *mux) getFriends(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -195,7 +195,7 @@ func (m *mux) getFriends(c echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/location [PUT]
-func (m *mux) updateLocation(c echo.Context) error {
+func (m *mux) updateLocation(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[updateLocationRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -228,7 +228,7 @@ func (m *mux) updateLocation(c echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/location [DELETE]
-func (m *mux) wipeLocation(c echo.Context) error {
+func (m *mux) wipeLocation(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -256,7 +256,7 @@ func (m *mux) wipeLocation(c echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend [POST]
-func (m *mux) befriend(c echo.Context) error {
+func (m *mux) befriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -320,7 +320,7 @@ func (m *mux) befriend(c echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend [DELETE]
-func (m *mux) unfriend(c echo.Context) error {
+func (m *mux) unfriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -356,7 +356,7 @@ func (m *mux) unfriend(c echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend/accept [POST]
-func (m *mux) acceptFriend(c echo.Context) error {
+func (m *mux) acceptFriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -416,7 +416,7 @@ func (m *mux) acceptFriend(c echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend/reject [POST]
-func (m *mux) rejectFriend(c echo.Context) error {
+func (m *mux) rejectFriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -463,7 +463,7 @@ func (m *mux) rejectFriend(c echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/sharing/stop [POST]
-func (m *mux) stopSharing(c echo.Context) error {
+func (m *mux) stopSharing(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -505,7 +505,7 @@ func (m *mux) stopSharing(c echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/sharing/resume [POST]
-func (m *mux) resumeSharing(c echo.Context) error {
+func (m *mux) resumeSharing(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)
@@ -546,7 +546,7 @@ func (m *mux) resumeSharing(c echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/sharing [GET]
-func (m *mux) getPaused(c echo.Context) error {
+func (m *mux) getPaused(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
 	if bindErr != nil {
 		return bindErr.Echo(c)

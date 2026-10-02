@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5/middleware"
 
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -15,8 +15,8 @@ import (
 	"whereiseveryone/pkg/jwt"
 	"whereiseveryone/pkg/logger"
 
-	"github.com/go-playground/validator"
-	"github.com/labstack/echo/v4"
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/echo/v5"
 )
 
 const sessionLookupTimeout = 15 * time.Second
@@ -33,7 +33,8 @@ func (v *echoValidator) Validate(i any) error {
 	return v.validator.Struct(i) //nolint:wrapcheck  // that's ok (echo framework)
 }
 
-func GetJWTToken(c echo.Context) (jwt.SignedToken, error) {
+// GetJWTToken returns the authenticated token claims attached to the request.
+func GetJWTToken(c *echo.Context) (jwt.SignedToken, error) {
 	token := c.Get("user")
 	jwtToken, ok := token.(jwt.SignedToken)
 	if !ok {
@@ -80,11 +81,11 @@ func NewEcho(
 	debug bool,
 ) *echo.Echo {
 	e := echo.New()
-	e.Debug = debug
+	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(debug)
 	e.Validator = &echoValidator{validator: validate}
 
 	authMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			jwtToken := c.Request().Header.Get("Authorization")
 			if jwtToken == "" {
 				return c.String(403, "missing jwt token")
@@ -139,31 +140,29 @@ func NewEcho(
 	routers.AuthRouter.Route(authRouter, authMiddleware)
 	routers.MeRouter.Route(meRouter, authMiddleware)
 
-	e.GET("health", func(c echo.Context) error {
+	e.GET("health", func(c *echo.Context) error {
 		return c.JSON(200, "ok")
 	})
 
 	if debug {
 		e.Use(middleware.RequestLogger())
 	} else {
-		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
-				start := time.Now()
-				err := next(c)
-				if err != nil {
-					c.Error(err)
-				}
+		e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+			HandleError: true,
+			LogStatus:   true,
+			LogLatency:  true,
+			LogValuesFunc: func(c *echo.Context, values middleware.RequestLoggerValues) error {
 				entry := logger.MakeEchoLogEntry(log, c).
-					WithField("status", c.Response().Status).
-					WithField("latency", time.Since(start).String())
-				if err != nil {
-					entry.WithError(err).Warn("request failed")
+					WithField("status", values.Status).
+					WithField("latency", values.Latency.String())
+				if values.Error != nil {
+					entry.WithError(values.Error).Warn("request failed")
 				} else {
 					entry.Info("request completed")
 				}
 				return nil
-			}
-		})
+			},
+		}))
 	}
 
 	return e

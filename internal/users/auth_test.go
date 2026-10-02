@@ -1,17 +1,13 @@
 package users
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"whereiseveryone/pkg/id"
 )
 
@@ -42,27 +38,7 @@ func TestRefreshDigestMatching(t *testing.T) {
 
 // Run with MONGO_TEST_URI pointing at an isolated MongoDB instance.
 func TestMongoRefreshRotation(t *testing.T) {
-	uri := os.Getenv("MONGO_TEST_URI")
-	if uri == "" {
-		t.Skip("set MONGO_TEST_URI to run MongoDB rotation regression tests")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := client.Disconnect(ctx); err != nil {
-			t.Error(err)
-		}
-	}()
-	db := client.Database("refresh_regression_" + id.NewID().Hex())
-	defer func() {
-		if err := db.Drop(ctx); err != nil {
-			t.Error(err)
-		}
-	}()
+	ctx, db := newMongoTestDatabase(t)
 	clock := authTestClock{time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)}
 	adapter := mongoAuthAdapter{coll: db.Collection("users"), timer: clock}
 	read := func(userID id.ID) Auth {
@@ -115,11 +91,11 @@ func TestMongoRefreshRotation(t *testing.T) {
 			if current.Token != fmt.Sprintf("access-%d", winner) || !current.MatchesRefresh(fmt.Sprintf("refresh-%d", winner)) || current.RefreshToken != "" {
 				t.Fatal("database did not persist only the winner and its refresh digest")
 			}
-			var raw bson.M
+			var raw bson.Raw
 			if err := adapter.coll.FindOne(ctx, withUserId(userID)).Decode(&raw); err != nil {
 				t.Fatal(err)
 			}
-			if _, exists := raw["auth"].(bson.M)["refresh_token"]; exists {
+			if raw.Lookup("auth", "refresh_token").Type != 0 {
 				t.Fatal("plaintext refresh field was not removed")
 			}
 			if current.PreviousAccessDigest != TokenDigest(previous.Token) || !current.PreviousAccessValidUntil.Equal(clock.now.Add(120*time.Second)) {

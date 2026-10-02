@@ -3,7 +3,7 @@ package logger
 import (
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,7 +14,8 @@ func NewLogger() *logrus.Logger {
 	return l
 }
 
-func MakeEchoLogEntry(logger Logger, c echo.Context) *logrus.Entry {
+// MakeEchoLogEntry adds request metadata to a structured log entry.
+func MakeEchoLogEntry(logger Logger, c *echo.Context) *logrus.Entry {
 	if c == nil {
 		return logger.WithFields(logrus.Fields{
 			"at": time.Now().Format("2006-01-02 15:04:05"),

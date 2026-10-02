@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const timeout = time.Duration(30) * time.Second
@@ -55,7 +55,7 @@ func NewMongoWithPassword(ctx context.Context, db, uri, authDB, user, pass strin
 
 func newMongo(ctx context.Context, db string, opts *options.ClientOptions) (*Collections, error) {
 
-	cl, err := mongo.Connect(ctx, opts)
+	cl, err := mongo.Connect(opts)
 	if err != nil {
 		return nil, fmt.Errorf("connect to the db: %w", err)
 	}

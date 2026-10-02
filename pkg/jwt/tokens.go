@@ -10,7 +10,7 @@ import (
 	"whereiseveryone/pkg/id"
 	"whereiseveryone/pkg/timer"
 
-	jwtgo "github.com/golang-jwt/jwt"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
 type JWT struct {
@@ -32,7 +32,7 @@ type SignedToken struct {
 	ID       string
 	Purpose  string `json:"token_use"`
 
-	jwtgo.StandardClaims
+	jwtgo.RegisteredClaims
 }
 
 var ErrTokenExpired = errors.New("token is expired")
@@ -67,9 +67,9 @@ func (j JWT) generateToken(username string, userID id.ID, purpose string, expire
 		UserName: username,
 		ID:       userID.Hex(),
 		Purpose:  purpose,
-		StandardClaims: jwtgo.StandardClaims{
-			Id:        base64.RawURLEncoding.EncodeToString(nonce[:]),
-			ExpiresAt: expiresAt.Unix(),
+		RegisteredClaims: jwtgo.RegisteredClaims{
+			ID:        base64.RawURLEncoding.EncodeToString(nonce[:]),
+			ExpiresAt: jwtgo.NewNumericDate(expiresAt),
 		},
 	}
 	return jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims).SignedString(j.secret)
@@ -84,11 +84,11 @@ func (j JWT) ValidateRefreshToken(signed string) (SignedToken, error) {
 }
 
 func (j JWT) validateToken(signed, purpose string) (SignedToken, error) {
-	parser := jwtgo.Parser{
-		ValidMethods: []string{jwtgo.SigningMethodHS256.Alg()},
+	parser := jwtgo.NewParser(
+		jwtgo.WithValidMethods([]string{jwtgo.SigningMethodHS256.Alg()}),
 		// Validate times below using the injected clock, after verifying the signature.
-		SkipClaimsValidation: true,
-	}
+		jwtgo.WithoutClaimsValidation(),
+	)
 	token, err := parser.ParseWithClaims(
 		signed,
 		&SignedToken{},
@@ -107,14 +107,15 @@ func (j JWT) validateToken(signed, purpose string) (SignedToken, error) {
 	if claims.Purpose != purpose {
 		return SignedToken{}, ErrInvalidTokenPurpose
 	}
-	if claims.ExpiresAt == 0 {
+	if claims.ExpiresAt == nil || claims.ExpiresAt.Unix() == 0 {
 		return SignedToken{}, errors.New("missing token expiration")
 	}
-	now := j.timer.Now().Unix()
-	if claims.ExpiresAt <= now {
+	now := j.timer.Now()
+	if !now.Before(claims.ExpiresAt.Time) {
 		return SignedToken{}, ErrTokenExpired
 	}
-	if !claims.VerifyIssuedAt(now, false) || !claims.VerifyNotBefore(now, false) {
+	if (claims.IssuedAt != nil && now.Before(claims.IssuedAt.Time)) ||
+		(claims.NotBefore != nil && now.Before(claims.NotBefore.Time)) {
 		return SignedToken{}, errors.New("token is not yet valid")
 	}
 	userID, err := id.FromString(claims.ID)
