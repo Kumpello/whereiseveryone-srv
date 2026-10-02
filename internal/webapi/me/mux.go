@@ -72,7 +72,7 @@ func (m *mux) updateStatus(c *echo.Context) error {
 // getFriends
 //
 // @summary get friends details
-// @description returns accepted friends and pending friend requests
+// @description returns friends and pending requests; pending entries omit status and location
 // @tags me
 // @produce json
 // @success 200 {object} getFriendsResponse
@@ -143,12 +143,7 @@ func (m *mux) getFriends(c *echo.Context) error {
 	result := make(getFriendsResponse, 0, len(friends)+len(incomingUsers)+len(outgoingUsers))
 
 	for _, u := range friends {
-		friend := friendDetails{
-			Username:    u.Auth.Username,
-			Status:      u.Status,
-			State:       friendStateAccepted,
-			FriendSince: newTimestampPtr(user.FriendSinceFor(u.ID)),
-		}
+		friend := newFriendDetails(u.Auth.Username, u.Status, friendStateAccepted, user.FriendSinceFor(u.ID))
 
 		if u.Location != nil && !slices.Contains(u.PausedUsers, user.ID) {
 			friend.Location = &locationDetails{
@@ -168,7 +163,7 @@ func (m *mux) getFriends(c *echo.Context) error {
 	for _, u := range incomingUsers {
 		result = append(result, newFriendDetails(
 			u.Auth.Username,
-			u.Status,
+			"",
 			friendStatePendingIncoming,
 			nil,
 		))
@@ -177,7 +172,7 @@ func (m *mux) getFriends(c *echo.Context) error {
 	for _, u := range outgoingUsers {
 		result = append(result, newFriendDetails(
 			u.Auth.Username,
-			u.Status,
+			"",
 			friendStatePendingOutgoing,
 			nil,
 		))
@@ -406,12 +401,9 @@ func (m *mux) acceptFriend(c *echo.Context) error {
 	}
 
 	friendSinceTime := currentUser.FriendSinceFor(requester.ID)
-	return c.JSON(http.StatusOK, friendDetails{
-		Username:    requester.Auth.Username,
-		Status:      requester.Status,
-		State:       friendStateAccepted,
-		FriendSince: newTimestampPtr(friendSinceTime),
-	})
+	return c.JSON(http.StatusOK, newFriendDetails(
+		requester.Auth.Username, requester.Status, friendStateAccepted, friendSinceTime,
+	))
 }
 
 // rejectFriend

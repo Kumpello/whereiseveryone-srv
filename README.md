@@ -172,6 +172,10 @@ Deploying token-purpose validation invalidates all previously issued tokens with
 `token_use`; existing users must log in again. No database migration or new index is
 required. Protected requests now require an available MongoDB session lookup.
 
+`GET /me/friends` exposes status and eligible location only for accepted
+friendships. Incoming and outgoing pending entries omit `status` and `location`;
+accepted friends include `status` even when it is empty.
+
 ## Authentication abuse protection
 
 Login returns the same HTTP 403 JSON response for unknown usernames and incorrect

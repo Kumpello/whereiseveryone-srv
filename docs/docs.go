@@ -500,7 +500,7 @@ const docTemplate = `{
         },
         "/me/friends": {
             "get": {
-                "description": "returns accepted friends and pending friend requests",
+                "description": "returns friends and pending requests; pending entries omit status and location",
                 "produces": [
                     "application/json"
                 ],
@@ -934,6 +934,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/me.friendState"
                 },
                 "status": {
+                    "description": "Status is present only for accepted friends, even when empty.",
                     "type": "string"
                 },
                 "username": {

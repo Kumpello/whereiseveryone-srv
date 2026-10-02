@@ -59,20 +59,24 @@ type updateStatusRequest struct {
 type getFriendsResponse []friendDetails
 
 type friendDetails struct {
-	Username    string           `json:"username"`
-	Status      string           `json:"status"`
+	Username string `json:"username"`
+	// Status is present only for accepted friends, even when empty.
+	Status      *string          `json:"status,omitempty"`
 	State       friendState      `json:"state"`
 	Location    *locationDetails `json:"location,omitempty"`
 	FriendSince *timestamp       `json:"friend_since"`
 }
 
 func newFriendDetails(username, status string, state friendState, friendSince *time.Time) friendDetails {
-	return friendDetails{
+	friend := friendDetails{
 		Username:    username,
-		Status:      status,
 		State:       state,
 		FriendSince: newTimestampPtr(friendSince),
 	}
+	if state == friendStateAccepted {
+		friend.Status = &status
+	}
+	return friend
 }
 
 type locationDetails struct {

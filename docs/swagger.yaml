@@ -90,6 +90,7 @@ definitions:
       state:
         $ref: '#/definitions/me.friendState'
       status:
+        description: Status is present only for accepted friends, even when empty.
         type: string
       username:
         type: string
@@ -490,7 +491,8 @@ paths:
       - me
   /me/friends:
     get:
-      description: returns accepted friends and pending friend requests
+      description: returns friends and pending requests; pending entries omit status
+        and location
       produces:
       - application/json
       responses:
