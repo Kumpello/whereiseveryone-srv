@@ -17,14 +17,16 @@ definitions:
   auth.logInRequest:
     properties:
       device_token:
-        description: DeviceToken is a required, nonblank client device identifier
-          for single-device auth
+        description: DeviceToken is a nonblank device identifier of at most 256 characters
+        maxLength: 256
         type: string
       password:
-        description: Password user password
+        description: Password is at most 72 bytes
+        maxLength: 72
         type: string
       username:
-        description: Username
+        description: Username is at most 64 characters
+        maxLength: 64
         type: string
     required:
     - device_token
@@ -34,10 +36,12 @@ definitions:
   auth.refreshTokenRequest:
     properties:
       device_token:
-        description: DeviceToken is required and must match the device bound to the
-          current session
+        description: DeviceToken must match the session device; at most 256 characters
+        maxLength: 256
         type: string
       refresh_token:
+        description: RefreshToken is an encoded JWT of at most 4096 bytes
+        maxLength: 4096
         type: string
     required:
     - device_token
@@ -46,15 +50,17 @@ definitions:
   auth.signUpRequest:
     properties:
       device_token:
-        description: DeviceToken is a required, nonblank client device identifier
-          for single-device auth
+        description: DeviceToken is a nonblank device identifier of at most 256 characters
+        maxLength: 256
         type: string
       password:
-        description: Password user password, min 8 characters
+        description: Password is at least 8 characters and at most 72 bytes
+        maxLength: 72
         minLength: 8
         type: string
       username:
-        description: Username username, must be unique
+        description: Username must be unique and at most 64 characters
+        maxLength: 64
         type: string
     required:
     - device_token
@@ -91,6 +97,8 @@ definitions:
   me.friendRequest:
     properties:
       username:
+        description: Username is at most 64 characters.
+        maxLength: 64
         type: string
     type: object
   me.friendState:
@@ -147,11 +155,15 @@ definitions:
   me.updateStatusRequest:
     properties:
       status:
+        description: Status is at most 1024 characters; an empty string clears the
+          status.
+        maxLength: 1024
         type: string
     type: object
 info:
   contact: {}
-  description: This is a sample server for WhereIsEveryone
+  description: 'Request bodies: max 16 KiB (413); JSON bodies require application/json
+    (415).'
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
@@ -193,6 +205,14 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -241,6 +261,14 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -271,6 +299,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "409":
           description: conflict (user with such a name exists)
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
@@ -307,6 +343,14 @@ paths:
           description: requested user not exists
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -338,6 +382,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "404":
           description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
@@ -374,6 +426,14 @@ paths:
           description: requested user not exists
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -406,6 +466,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "404":
           description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
@@ -477,6 +545,14 @@ paths:
           description: invalid token
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -526,6 +602,14 @@ paths:
           description: invalid request
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
           schema:
@@ -550,6 +634,14 @@ paths:
           description: No Content
         "400":
           description: invalid request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
@@ -582,6 +674,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "401":
           description: invalid token
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: request body exceeds 16 KiB
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: content type must be application/json
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":

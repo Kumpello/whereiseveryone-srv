@@ -3,6 +3,7 @@ package jwt
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,28 @@ import (
 type fixedTimer struct{ now time.Time }
 
 func (c fixedTimer) Now() time.Time { return c.now }
+
+func TestTokenSizeLimitBeforeParsing(t *testing.T) {
+	j := NewJWT(fixedTimer{time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)}, []byte("secret"), time.Minute, time.Hour)
+	for _, validate := range []struct {
+		name string
+		call func(string) (SignedToken, error)
+	}{
+		{"access", j.ValidateAccessToken},
+		{"refresh", j.ValidateRefreshToken},
+	} {
+		t.Run(validate.name, func(t *testing.T) {
+			if _, err := validate.call(strings.Repeat("x", MaxTokenBytes)); err == nil || errors.Is(err, ErrTokenTooLarge) {
+				t.Fatalf("maximum-size malformed token should reach parsing: %v", err)
+			}
+			for _, size := range []int{MaxTokenBytes + 1, 2 * 1024 * 1024} {
+				if _, err := validate.call(strings.Repeat("x", size)); !errors.Is(err, ErrTokenTooLarge) {
+					t.Fatalf("%d-byte token error = %v, want size limit", size, err)
+				}
+			}
+		})
+	}
+}
 
 func TestTokenPurposes(t *testing.T) {
 	now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)

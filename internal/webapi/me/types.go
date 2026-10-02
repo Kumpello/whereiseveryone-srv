@@ -52,7 +52,8 @@ const (
 )
 
 type updateStatusRequest struct {
-	Status string `json:"status"`
+	// Status is at most 1024 characters; an empty string clears the status.
+	Status string `json:"status" validate:"max=1024"`
 }
 
 type getFriendsResponse []friendDetails
@@ -91,7 +92,8 @@ type updateLocationRequest struct {
 }
 
 type friendRequest struct {
-	Username string `json:"username"`
+	// Username is at most 64 characters.
+	Username string `json:"username" validate:"max=64"`
 }
 
 type getPausedResponse []pausedFriendDetails

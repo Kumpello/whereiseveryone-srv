@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"whereiseveryone/internal/users"
+	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/crypto"
 	"whereiseveryone/pkg/id"
@@ -64,9 +65,9 @@ func (m *mux) acquirePasswordSlot(ctx context.Context) (func(), error) {
 }
 
 func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
-	g.POST("/signup", m.signUp)
-	g.POST("/login", m.logIn)
-	g.POST("/refresh", m.refreshToken)
+	g.POST("/signup", m.signUp, webapi.RequireJSON)
+	g.POST("/login", m.logIn, webapi.RequireJSON)
+	g.POST("/refresh", m.refreshToken, webapi.RequireJSON)
 }
 
 func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, incomingDeviceToken string) (bool, error) {
@@ -96,6 +97,8 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 // @description creates a new user
 // @tags auth
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @produces json
 // @param userDetails body signUpRequest true "sign up details"
 // @success 200 {object} authResponse
@@ -113,6 +116,10 @@ func (m *mux) signUp(c *echo.Context) error {
 	}
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+	if len(request.Password) > 72 {
+		err := jsonerr.EchoInvalidRequestError(errors.New("password must not exceed 72 bytes"))
+		return err.Echo(c) //nolint:wrapcheck // Echo writes the HTTP response; no extra error context is needed.
 	}
 	if strings.TrimSpace(request.DeviceToken) == "" {
 		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
@@ -171,6 +178,8 @@ func (m *mux) signUp(c *echo.Context) error {
 // @description logs in as an exiting users using login and passowrd
 // @tags auth
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @produces json
 // @param userDetails body logInRequest true "login details"
 // @success 200 {object} authResponse
@@ -190,6 +199,10 @@ func (m *mux) logIn(c *echo.Context) error {
 	}
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+	if len(request.Password) > 72 {
+		err := jsonerr.EchoInvalidRequestError(errors.New("password must not exceed 72 bytes"))
+		return err.Echo(c) //nolint:wrapcheck // Echo writes the HTTP response; no extra error context is needed.
 	}
 	if strings.TrimSpace(request.DeviceToken) == "" {
 		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)
@@ -244,6 +257,8 @@ func (m *mux) logIn(c *echo.Context) error {
 // @description atomically consumes the current refresh-purpose token for the bound device; refresh reuse is rejected immediately; the previous access token remains valid for up to 120 seconds, subject to its expiration
 // @tags auth
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @produces json
 // @param refresh body refreshTokenRequest true "refresh token"
 // @success 200 {object} authResponse
@@ -269,6 +284,10 @@ func (m *mux) refreshToken(c *echo.Context) error {
 
 	if err := c.Validate(request); err != nil {
 		return jsonerr.EchoInvalidRequestError(err).Echo(c)
+	}
+	if len(request.RefreshToken) > jwt.MaxTokenBytes {
+		err := jsonerr.EchoInvalidRequestError(jwt.ErrTokenTooLarge)
+		return err.Echo(c) //nolint:wrapcheck // Echo writes the HTTP response; no extra error context is needed.
 	}
 	if strings.TrimSpace(request.DeviceToken) == "" {
 		return jsonerr.EchoInvalidRequestError(errors.New("device_token must not be blank")).Echo(c)

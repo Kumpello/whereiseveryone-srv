@@ -38,6 +38,12 @@ type SignedToken struct {
 var ErrTokenExpired = errors.New("token is expired")
 var ErrInvalidTokenPurpose = errors.New("invalid token purpose")
 
+// ErrTokenTooLarge indicates that an encoded JWT exceeds MaxTokenBytes.
+var ErrTokenTooLarge = errors.New("token is too large")
+
+// MaxTokenBytes bounds encoded JWTs before decoding their header or claims.
+const MaxTokenBytes = 4096
+
 const (
 	accessPurpose  = "access"
 	refreshPurpose = "refresh"
@@ -84,6 +90,10 @@ func (j JWT) ValidateRefreshToken(signed string) (SignedToken, error) {
 }
 
 func (j JWT) validateToken(signed, purpose string) (SignedToken, error) {
+	if len(signed) > MaxTokenBytes {
+		return SignedToken{}, ErrTokenTooLarge
+	}
+
 	parser := jwtgo.NewParser(
 		jwtgo.WithValidMethods([]string{jwtgo.SigningMethodHS256.Alg()}),
 		// Validate times below using the injected clock, after verifying the signature.

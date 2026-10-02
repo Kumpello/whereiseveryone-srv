@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"whereiseveryone/internal/users"
+	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/binder"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/timer"
@@ -22,16 +23,16 @@ func NewMux(userAdapter users.Adapter, timer timer.Timer) *mux {
 }
 
 func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
-	g.PUT("/status", m.updateStatus)
+	g.PUT("/status", m.updateStatus, webapi.RequireJSON)
 	g.GET("/friends", m.getFriends)
-	g.PUT("/location", m.updateLocation)
+	g.PUT("/location", m.updateLocation, webapi.RequireJSON)
 	g.DELETE("/location", m.wipeLocation)
-	g.POST("/friend", m.befriend)
-	g.DELETE("/friend", m.unfriend)
-	g.POST("/friend/accept", m.acceptFriend)
-	g.POST("/friend/reject", m.rejectFriend)
-	g.POST("/sharing/stop", m.stopSharing)
-	g.POST("/sharing/resume", m.resumeSharing)
+	g.POST("/friend", m.befriend, webapi.RequireJSON)
+	g.DELETE("/friend", m.unfriend, webapi.RequireJSON)
+	g.POST("/friend/accept", m.acceptFriend, webapi.RequireJSON)
+	g.POST("/friend/reject", m.rejectFriend, webapi.RequireJSON)
+	g.POST("/sharing/stop", m.stopSharing, webapi.RequireJSON)
+	g.POST("/sharing/resume", m.resumeSharing, webapi.RequireJSON)
 	g.GET("/sharing", m.getPaused)
 }
 
@@ -41,6 +42,8 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 // @description updates logged user status (text status)
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @produce json
 // @param status body updateStatusRequest true "update status object"
 // @success 204
@@ -189,6 +192,8 @@ func (m *mux) getFriends(c *echo.Context) error {
 // @description update logged user location
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param location body updateLocationRequest true "update location object"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -249,6 +254,8 @@ func (m *mux) wipeLocation(c *echo.Context) error {
 // @description sends friend request to another user
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to friend"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -313,6 +320,8 @@ func (m *mux) befriend(c *echo.Context) error {
 // @description removes friend and clears pending requests between users
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to unfriend"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -349,6 +358,8 @@ func (m *mux) unfriend(c *echo.Context) error {
 // @description accepts pending friend request from another user
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to accept"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -409,6 +420,8 @@ func (m *mux) acceptFriend(c *echo.Context) error {
 // @description rejects pending friend request from another user
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to reject"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -458,6 +471,8 @@ func (m *mux) rejectFriend(c *echo.Context) error {
 // @description stop sharing location with another user
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to stop sharing with"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
@@ -500,6 +515,8 @@ func (m *mux) stopSharing(c *echo.Context) error {
 // @description resume sharing location with another user
 // @tags me
 // @accept json
+// @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
+// @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to resume sharing with"
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"

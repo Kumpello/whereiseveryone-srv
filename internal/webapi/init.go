@@ -83,6 +83,7 @@ func NewEcho(
 	e := echo.New()
 	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(debug)
 	e.Validator = &echoValidator{validator: validate}
+	e.Pre(limitRequestBody)
 
 	authMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {

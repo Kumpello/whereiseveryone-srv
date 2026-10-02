@@ -74,6 +74,18 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -144,6 +156,18 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -189,6 +213,18 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "conflict (user with such a name exists)",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -245,6 +281,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -291,6 +339,18 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -347,6 +407,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -395,6 +467,18 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -476,6 +560,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -579,6 +675,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -615,6 +723,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -668,6 +788,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "413": {
+                        "description": "request body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "content type must be application/json",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "500": {
                         "description": "internal server error",
                         "schema": {
@@ -705,16 +837,19 @@ const docTemplate = `{
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken is a required, nonblank client device identifier for single-device auth",
-                    "type": "string"
+                    "description": "DeviceToken is a nonblank device identifier of at most 256 characters",
+                    "type": "string",
+                    "maxLength": 256
                 },
                 "password": {
-                    "description": "Password user password",
-                    "type": "string"
+                    "description": "Password is at most 72 bytes",
+                    "type": "string",
+                    "maxLength": 72
                 },
                 "username": {
-                    "description": "Username",
-                    "type": "string"
+                    "description": "Username is at most 64 characters",
+                    "type": "string",
+                    "maxLength": 64
                 }
             }
         },
@@ -726,11 +861,14 @@ const docTemplate = `{
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken is required and must match the device bound to the current session",
-                    "type": "string"
+                    "description": "DeviceToken must match the session device; at most 256 characters",
+                    "type": "string",
+                    "maxLength": 256
                 },
                 "refresh_token": {
-                    "type": "string"
+                    "description": "RefreshToken is an encoded JWT of at most 4096 bytes",
+                    "type": "string",
+                    "maxLength": 4096
                 }
             }
         },
@@ -743,17 +881,20 @@ const docTemplate = `{
             ],
             "properties": {
                 "device_token": {
-                    "description": "DeviceToken is a required, nonblank client device identifier for single-device auth",
-                    "type": "string"
+                    "description": "DeviceToken is a nonblank device identifier of at most 256 characters",
+                    "type": "string",
+                    "maxLength": 256
                 },
                 "password": {
-                    "description": "Password user password, min 8 characters",
+                    "description": "Password is at least 8 characters and at most 72 bytes",
                     "type": "string",
+                    "maxLength": 72,
                     "minLength": 8
                 },
                 "username": {
-                    "description": "Username username, must be unique",
-                    "type": "string"
+                    "description": "Username must be unique and at most 64 characters",
+                    "type": "string",
+                    "maxLength": 64
                 }
             }
         },
@@ -798,7 +939,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "username": {
-                    "type": "string"
+                    "description": "Username is at most 64 characters.",
+                    "type": "string",
+                    "maxLength": 64
                 }
             }
         },
@@ -881,7 +1024,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "status": {
-                    "type": "string"
+                    "description": "Status is at most 1024 characters; an empty string clears the status.",
+                    "type": "string",
+                    "maxLength": 1024
                 }
             }
         }
@@ -902,7 +1047,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "WhereIsEveryone",
-	Description:      "This is a sample server for WhereIsEveryone",
+	Description:      "Request bodies: max 16 KiB (413); JSON bodies require application/json (415).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

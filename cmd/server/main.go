@@ -39,7 +39,7 @@ const (
 
 // @title WhereIsEveryone
 // @version 1.0
-// @description This is a sample server for WhereIsEveryone
+// @description Request bodies: max 16 KiB (413); JSON bodies require application/json (415).
 
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html

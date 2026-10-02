@@ -219,6 +219,21 @@ and commit it to the repository.
 
 ## Binding Requests
 
+All request bodies are limited to 16 KiB before authentication and binding,
+including chunked bodies and trailing data. Oversized requests return HTTP 413.
+Routes documented with a JSON body require `Content-Type: application/json`
+(optional media type parameters such as `charset=utf-8` are accepted); other or
+missing content types return HTTP 415. Routes without a documented body do not
+require a content type.
+
+Usernames are limited to 64 Unicode characters, device identifiers to 256, and
+statuses to 1,024. An empty status clears it. Passwords are limited to 72 bytes
+(the bcrypt limit), and signup still requires at least eight characters.
+Oversized fields return HTTP 400. Encoded access and refresh JWTs are limited to
+4,096 bytes before parsing; oversized Bearer credentials return HTTP 403.
+These validation limits apply to new requests; existing stored fields are not
+rewritten.
+
 There is a very useful generic function that binds the HTTP request and validates it.
 
 ```go
