@@ -535,7 +535,7 @@ const docTemplate = `{
         },
         "/me/location": {
             "put": {
-                "description": "update logged user location",
+                "description": "Unix-ms fix time: max age 24h, future skew 5m (capped); older/duplicate fixes ignored.",
                 "consumes": [
                     "application/json"
                 ],
@@ -967,6 +967,9 @@ const docTemplate = `{
         },
         "me.locationDetails": {
             "type": "object",
+            "required": [
+                "last_update"
+            ],
             "properties": {
                 "accuracy": {
                     "type": "number"
@@ -978,8 +981,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "last_update": {
-                    "description": "LastUpdate in UTC time",
-                    "type": "string"
+                    "description": "LastUpdate is the location fix time in Unix milliseconds (UTC).",
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "latitude": {
                     "type": "number"
@@ -1002,6 +1006,9 @@ const docTemplate = `{
         },
         "me.updateLocationRequest": {
             "type": "object",
+            "required": [
+                "last_update"
+            ],
             "properties": {
                 "accuracy": {
                     "type": "number"
@@ -1013,8 +1020,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "last_update": {
-                    "description": "LastUpdate in UTC time",
-                    "type": "string"
+                    "description": "LastUpdate is the location fix time in Unix milliseconds (UTC).",
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "latitude": {
                     "type": "number"

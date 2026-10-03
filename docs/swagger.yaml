@@ -120,14 +120,17 @@ definitions:
       bearing:
         type: number
       last_update:
-        description: LastUpdate in UTC time
-        type: string
+        description: LastUpdate is the location fix time in Unix milliseconds (UTC).
+        format: int64
+        type: integer
       latitude:
         type: number
       longitude:
         type: number
       speed:
         type: number
+    required:
+    - last_update
     type: object
   me.pausedFriendDetails:
     properties:
@@ -143,14 +146,17 @@ definitions:
       bearing:
         type: number
       last_update:
-        description: LastUpdate in UTC time
-        type: string
+        description: LastUpdate is the location fix time in Unix milliseconds (UTC).
+        format: int64
+        type: integer
       latitude:
         type: number
       longitude:
         type: number
       speed:
         type: number
+    required:
+    - last_update
     type: object
   me.updateStatusRequest:
     properties:
@@ -532,7 +538,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: update logged user location
+      description: 'Unix-ms fix time: max age 24h, future skew 5m (capped); older/duplicate
+        fixes ignored.'
       parameters:
       - description: update location object
         in: body

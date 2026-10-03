@@ -256,6 +256,19 @@ Put it in `.env` and generate `./.env/cloud.json` from the cloud template using
 
 # Documentation
 
+Location uploads (`PUT /me/location`) require `last_update` as a positive integer
+in Unix milliseconds (UTC), representing when the fix was measured. The server
+rejects missing, null, malformed, and out-of-range timestamps with 400 before
+writing to the database. The accepted window is from 24 hours before server receipt
+time through 5 minutes after it, inclusive. These limits allow delayed uploads and
+modest device clock skew; they are application policy, not a universal standard.
+Accepted future timestamps are capped at server receipt time, at millisecond precision.
+MongoDB atomically replaces a location only when the incoming fix is newer. Older
+and duplicate fixes return 204 without changing the stored location, making retries
+safe under concurrent uploads. New users and wiped locations accept their first
+valid fix. Android clients should send the location provider's fix time, preserve
+it on retry, and treat 400 as a permanent rejection of that fix.
+
 Docs are served in /swagger endpoint.
 Ref: https://github.com/swaggo/echo-swagger
 

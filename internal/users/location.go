@@ -46,6 +46,12 @@ func (l mongoLocationAdapter) UpdateLocation(ctx context.Context, userID id.ID, 
 	}
 
 	filter := withUserId(userID)
+	// Compare and update atomically so delayed requests and retries cannot overwrite
+	// a newer fix. Missing timestamps also cover new users and wiped locations.
+	filter["$or"] = bson.A{
+		bson.M{locationField + ".last_update": bson.M{"$exists": false}},
+		bson.M{locationField + ".last_update": bson.M{"$lt": newLocation.LastUpdate}},
+	}
 	update := bson.M{
 		"$set": location,
 	}

@@ -2,6 +2,7 @@ package me
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"whereiseveryone/internal/users"
@@ -184,7 +185,7 @@ func (m *mux) getFriends(c *echo.Context) error {
 // updateLocation
 //
 // @summary update location
-// @description update logged user location
+// @description Unix-ms fix time: max age 24h, future skew 5m (capped); older/duplicate fixes ignored.
 // @tags me
 // @accept json
 // @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
@@ -203,6 +204,13 @@ func (m *mux) updateLocation(c *echo.Context) error {
 	defer request.Cancel()
 
 	newLoc := request.Request
+	lastUpdate, validationErr := newLoc.validatedLastUpdate(m.timer.Now())
+	if validationErr != nil {
+		if responseErr := jsonerr.EchoInvalidRequestError(validationErr).Echo(c); responseErr != nil {
+			return fmt.Errorf("write invalid location response: %w", responseErr)
+		}
+		return nil
+	}
 	err := m.userAdapter.UpdateLocation(request.Context(), request.UserID(), users.Location{
 		Longitude:  newLoc.Longitude,
 		Latitude:   newLoc.Latitude,
@@ -210,7 +218,7 @@ func (m *mux) updateLocation(c *echo.Context) error {
 		Bearing:    newLoc.Bearing,
 		Accuracy:   newLoc.Accuracy,
 		Speed:      newLoc.Speed,
-		LastUpdate: newLoc.LastUpdate.Time(),
+		LastUpdate: lastUpdate,
 	})
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)

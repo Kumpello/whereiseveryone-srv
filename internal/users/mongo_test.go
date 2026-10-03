@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,6 +42,63 @@ func newMongoTestDatabase(t *testing.T) (context.Context, *mongo.Database) {
 		t.Fatal(err)
 	}
 	return ctx, db
+}
+
+func TestMongoLocationOnlyReplacesOlderFixes(t *testing.T) {
+	ctx, db := newMongoTestDatabase(t)
+	log := logrus.New()
+	log.SetOutput(io.Discard)
+	clock := authTestClock{time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)}
+	adapter := NewMongoAdapter(db.Collection("users"), db.Collection("pending_friend_requests"), clock, log)
+	user, err := adapter.NewUser(ctx, User{Auth: Auth{Username: "alice"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := Location{Longitude: 21, Latitude: 52, LastUpdate: clock.now}
+	if err := adapter.UpdateLocation(ctx, user.ID, first); err != nil {
+		t.Fatal(err)
+	}
+	assertLocation := func(want Location) {
+		t.Helper()
+		stored, err := adapter.GetUser(ctx, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stored.Location == nil || *stored.Location != want {
+			t.Fatalf("stored location = %+v, want %+v", stored.Location, want)
+		}
+	}
+	for _, offset := range []time.Duration{-time.Minute, 0} {
+		if err := adapter.UpdateLocation(ctx, user.ID, Location{Longitude: 99, LastUpdate: clock.now.Add(offset)}); err != nil {
+			t.Fatal(err)
+		}
+		assertLocation(first)
+	}
+
+	const updates = 32
+	errs := make(chan error, updates)
+	var workers sync.WaitGroup
+	for n := 1; n <= updates; n++ {
+		workers.Go(func() {
+			errs <- adapter.UpdateLocation(ctx, user.ID, Location{Longitude: float64(n), LastUpdate: clock.now.Add(time.Duration(n) * time.Millisecond)})
+		})
+	}
+	workers.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertLocation(Location{Longitude: updates, LastUpdate: clock.now.Add(updates * time.Millisecond)})
+
+	if err := adapter.WipeLocation(ctx, user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := adapter.UpdateLocation(ctx, user.ID, first); err != nil {
+		t.Fatal(err)
+	}
+	assertLocation(first)
 }
 
 func TestMongoUserOperations(t *testing.T) {

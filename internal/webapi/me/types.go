@@ -2,6 +2,7 @@ package me
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -34,12 +35,15 @@ func (t timestamp) MarshalJSON() ([]byte, error) {
 }
 
 func (t *timestamp) UnmarshalJSON(data []byte) error {
-	var value int64
+	var value *int64
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
+	if value == nil {
+		return errors.New("timestamp must be an integer in Unix milliseconds")
+	}
 
-	*t = newTimestamp(time.UnixMilli(value))
+	*t = newTimestamp(time.UnixMilli(*value))
 	return nil
 }
 
@@ -87,12 +91,33 @@ type locationDetails struct {
 	Accuracy  float64 `json:"accuracy,omitempty"`
 	Speed     float64 `json:"speed,omitempty"`
 
-	// LastUpdate in UTC time
-	LastUpdate timestamp `json:"last_update"`
+	// LastUpdate is the location fix time in Unix milliseconds (UTC).
+	LastUpdate timestamp `json:"last_update" swaggertype:"integer" format:"int64" binding:"required"`
 }
 
 type updateLocationRequest struct {
 	locationDetails `json:",inline"`
+}
+
+const (
+	// Allow delayed uploads without accepting arbitrary historical dates.
+	maxLocationAge = 24 * time.Hour
+	// Device clocks may be slightly ahead of the server clock.
+	maxLocationClockSkew = 5 * time.Minute
+)
+
+func (r updateLocationRequest) validatedLastUpdate(now time.Time) (time.Time, error) {
+	now = now.UTC().Truncate(time.Millisecond)
+	lastUpdate := r.LastUpdate.Time()
+	if lastUpdate.IsZero() || lastUpdate.UnixMilli() <= 0 ||
+		lastUpdate.Before(now.Add(-maxLocationAge)) || lastUpdate.After(now.Add(maxLocationClockSkew)) {
+		return time.Time{}, errors.New("last_update must be positive Unix milliseconds within the location upload window")
+	}
+	// An accepted clock skew must not store a future date or block subsequent fixes.
+	if lastUpdate.After(now) {
+		return now.UTC().Truncate(time.Millisecond), nil
+	}
+	return lastUpdate, nil
 }
 
 type friendRequest struct {
