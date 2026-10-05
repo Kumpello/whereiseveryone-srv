@@ -46,10 +46,14 @@ func (m mongoPendingFriendRequestAdapter) EnsureIndexes(ctx context.Context) err
 			{Key: "to", Value: 1},
 		},
 	}
+	incomingPageIdx := mongo.IndexModel{Keys: bson.D{
+		{Key: "to", Value: 1}, {Key: "from", Value: 1},
+	}}
 
 	_, err := m.coll.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		uniqueRequestIdx,
 		incomingRequestsIdx,
+		incomingPageIdx,
 	})
 	if err != nil {
 		return fmt.Errorf("create pending friend request indexes: %w", err)

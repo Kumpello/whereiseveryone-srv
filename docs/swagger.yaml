@@ -111,6 +111,15 @@ definitions:
     - friendStateAccepted
     - friendStatePendingIncoming
     - friendStatePendingOutgoing
+  me.getFriendsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/me.friendDetails'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   me.locationDetails:
     properties:
       accuracy:
@@ -395,6 +404,10 @@ paths:
           description: requested user not exists
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "409":
+          description: friend or pending request limit reached
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "413":
           description: request body exceeds 16 KiB
           schema:
@@ -423,8 +436,10 @@ paths:
         schema:
           $ref: '#/definitions/me.friendRequest'
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/me.friendDetails'
         "400":
           description: invalid request
           schema:
@@ -435,6 +450,10 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "404":
           description: requested user not exists
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "409":
+          description: friend or pending request limit reached
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
         "413":
@@ -496,17 +515,40 @@ paths:
       - me
   /me/friends:
     get:
-      description: returns friends and pending requests; pending entries omit status
-        and location
+      description: One bounded relationship page. Pending entries omit status and
+        location.
+      parameters:
+      - default: accepted
+        description: list
+        enum:
+        - accepted
+        - pending_incoming
+        - pending_outgoing
+        in: query
+        name: state
+        type: string
+      - default: 50
+        description: page size
+        in: query
+        maximum: 50
+        minimum: 1
+        name: limit
+        type: integer
+      - description: opaque next_cursor from the preceding page
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/me.friendDetails'
-            type: array
+            $ref: '#/definitions/me.getFriendsResponse'
+        "400":
+          description: invalid pagination parameters
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
         "401":
           description: invalid token
           schema:

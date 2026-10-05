@@ -60,7 +60,10 @@ type updateStatusRequest struct {
 	Status string `json:"status" validate:"max=1024"`
 }
 
-type getFriendsResponse []friendDetails
+type getFriendsResponse struct {
+	Items      []friendDetails `json:"items"`
+	NextCursor *string         `json:"next_cursor"`
+}
 
 type friendDetails struct {
 	Username string `json:"username"`

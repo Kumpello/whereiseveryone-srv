@@ -73,10 +73,14 @@ func (m *mux) updateStatus(c *echo.Context) error {
 // getFriends
 //
 // @summary get friends details
-// @description returns friends and pending requests; pending entries omit status and location
+// @description One bounded relationship page. Pending entries omit status and location.
 // @tags me
 // @produce json
+// @param state query string false "list" Enums(accepted,pending_incoming,pending_outgoing) default(accepted)
+// @param limit query int false "page size" minimum(1) maximum(50) default(50)
+// @param cursor query string false "opaque next_cursor from the preceding page"
 // @success 200 {object} getFriendsResponse
+// @failure 400 {object} jsonerr.JSONError "invalid pagination parameters"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friends [GET]
@@ -86,103 +90,35 @@ func (m *mux) getFriends(c *echo.Context) error {
 		return bindErr.Echo(c)
 	}
 	defer request.Cancel()
-
-	ctx := request.Context()
-
-	user, err := m.userAdapter.GetUser(ctx, request.UserID())
+	query, queryErr := parseFriendPage(c, request.UserID())
+	if queryErr != nil {
+		if err := jsonerr.EchoInvalidRequestError(queryErr).Echo(c); err != nil {
+			return fmt.Errorf("write invalid friend page response: %w", err)
+		}
+		return nil
+	}
+	page, err := m.userAdapter.GetFriendPage(request.Context(), request.UserID(), query)
 	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
+		return relationshipError(c, err)
 	}
-
-	type friendsLoad struct {
-		state friendState
-		users []users.User
-		err   error
+	next, err := nextFriendCursor(request.UserID(), query.State, page.NextID)
+	if err != nil {
+		return relationshipError(c, err)
 	}
-
-	loads := make(chan friendsLoad, 3)
-
-	go func() {
-		friends, err := m.userAdapter.GetUsers(ctx, user.SubscribedUsers)
-		loads <- friendsLoad{state: friendStateAccepted, users: friends, err: err}
-	}()
-
-	go func() {
-		incomingUserIDs, err := m.userAdapter.GetPendingIncomingFriendRequestUserIDs(ctx, user.ID)
-		if err != nil {
-			loads <- friendsLoad{state: friendStatePendingIncoming, err: err}
-			return
-		}
-		incomingUsers, err := m.userAdapter.GetUsers(ctx, incomingUserIDs)
-		loads <- friendsLoad{state: friendStatePendingIncoming, users: incomingUsers, err: err}
-	}()
-
-	go func() {
-		outgoingUserIDs, err := m.userAdapter.GetPendingOutgoingFriendRequestUserIDs(ctx, user.ID)
-		if err != nil {
-			loads <- friendsLoad{state: friendStatePendingOutgoing, err: err}
-			return
-		}
-		outgoingUsers, err := m.userAdapter.GetUsers(ctx, outgoingUserIDs)
-		loads <- friendsLoad{state: friendStatePendingOutgoing, users: outgoingUsers, err: err}
-	}()
-
-	var friends []users.User
-	var incomingUsers []users.User
-	var outgoingUsers []users.User
-	for range 3 {
-		load := <-loads
-		if load.err != nil {
-			return jsonerr.EchoInternalError(load.err).Echo(c)
-		}
-		switch load.state {
-		case friendStateAccepted:
-			friends = load.users
-		case friendStatePendingIncoming:
-			incomingUsers = load.users
-		case friendStatePendingOutgoing:
-			outgoingUsers = load.users
-		}
-	}
-
-	result := make(getFriendsResponse, 0, len(friends)+len(incomingUsers)+len(outgoingUsers))
-
-	for _, u := range friends {
-		friend := newFriendDetails(u.Auth.Username, u.Status, friendStateAccepted, user.FriendSinceFor(u.ID))
-
-		if u.Location != nil && !slices.Contains(u.PausedUsers, user.ID) {
+	result := getFriendsResponse{Items: make([]friendDetails, 0, len(page.Entries)), NextCursor: next}
+	for _, entry := range page.Entries {
+		u := entry.User
+		friend := newFriendDetails(u.Auth.Username, u.Status, friendState(query.State), entry.FriendSince)
+		if query.State == users.FriendListAccepted && u.Location != nil && !slices.Contains(u.PausedUsers, request.UserID()) {
 			friend.Location = &locationDetails{
-				Longitude:  u.Location.Longitude,
-				Latitude:   u.Location.Latitude,
-				Altitude:   u.Location.Altitude,
-				Bearing:    u.Location.Bearing,
-				Accuracy:   u.Location.Accuracy,
-				Speed:      u.Location.Speed,
+				Longitude: u.Location.Longitude, Latitude: u.Location.Latitude,
+				Altitude: u.Location.Altitude, Bearing: u.Location.Bearing,
+				Accuracy: u.Location.Accuracy, Speed: u.Location.Speed,
 				LastUpdate: newTimestamp(u.Location.LastUpdate),
 			}
 		}
-
-		result = append(result, friend)
+		result.Items = append(result.Items, friend)
 	}
-
-	for _, u := range incomingUsers {
-		result = append(result, newFriendDetails(
-			u.Auth.Username,
-			"",
-			friendStatePendingIncoming,
-			nil,
-		))
-	}
-
-	for _, u := range outgoingUsers {
-		result = append(result, newFriendDetails(
-			u.Auth.Username,
-			"",
-			friendStatePendingOutgoing,
-			nil,
-		))
-	}
-
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -268,6 +204,7 @@ func (m *mux) wipeLocation(c *echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
+// @failure 409 {object} jsonerr.JSONError "friend or pending request limit reached"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend [POST]
 func (m *mux) befriend(c *echo.Context) error {
@@ -315,7 +252,7 @@ func (m *mux) befriend(c *echo.Context) error {
 		userToBefriend.ID,
 	)
 	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
+		return relationshipError(c, err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -353,7 +290,7 @@ func (m *mux) unfriend(c *echo.Context) error {
 
 	err = m.userAdapter.UnfriendUser(request.Context(), request.UserID(), userToUnfriend.ID)
 	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
+		return relationshipError(c, err)
 	}
 
 	return c.NoContent(204)
@@ -368,10 +305,11 @@ func (m *mux) unfriend(c *echo.Context) error {
 // @failure 413 {object} jsonerr.JSONError "request body exceeds 16 KiB"
 // @failure 415 {object} jsonerr.JSONError "content type must be application/json"
 // @param user body friendRequest true "user to accept"
-// @success 204
+// @success 200 {object} friendDetails
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
+// @failure 409 {object} jsonerr.JSONError "friend or pending request limit reached"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
 // @router /me/friend/accept [POST]
 func (m *mux) acceptFriend(c *echo.Context) error {
@@ -401,10 +339,7 @@ func (m *mux) acceptFriend(c *echo.Context) error {
 		requester.ID,
 	)
 	if err != nil {
-		if errors.Is(err, users.ErrFriendRequestNotExists) {
-			return jsonerr.EchoNotFoundError(err).Echo(c)
-		}
-		return jsonerr.EchoInternalError(err).Echo(c)
+		return relationshipError(c, err)
 	}
 
 	currentUser, err := m.userAdapter.GetUser(ctx, request.UserID())
@@ -463,7 +398,7 @@ func (m *mux) rejectFriend(c *echo.Context) error {
 		if errors.Is(err, users.ErrFriendRequestNotExists) {
 			return jsonerr.EchoNotFoundError(err).Echo(c)
 		}
-		return jsonerr.EchoInternalError(err).Echo(c)
+		return relationshipError(c, err)
 	}
 
 	return c.NoContent(http.StatusNoContent)

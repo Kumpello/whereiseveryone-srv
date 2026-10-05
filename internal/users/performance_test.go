@@ -50,6 +50,8 @@ func TestMongoHotQueriesUseIndexes(t *testing.T) {
 		name, collection   string
 		filter, projection bson.M
 		returned           int
+		sort               bson.D
+		limit              int
 	}{
 		{name: "session_by_id", collection: "users", filter: withUserId(ids[0]), returned: 1},
 		{name: "login_by_username", collection: "users", filter: bson.M{"auth.username": "user-0"}, returned: 1},
@@ -60,11 +62,16 @@ func TestMongoHotQueriesUseIndexes(t *testing.T) {
 		}}, returned: 1},
 		{name: "incoming_pending", collection: "pending_friend_requests", filter: bson.M{"to": ids[0]}, projection: bson.M{"_id": 0, "from": 1}, returned: count - 1},
 		{name: "outgoing_pending", collection: "pending_friend_requests", filter: bson.M{"from": ids[0]}, projection: bson.M{"_id": 0, "to": 1}, returned: count - 1},
+		{name: "incoming_page", collection: "pending_friend_requests", filter: bson.M{"to": ids[0], "from": bson.M{"$gt": ids[0]}}, projection: bson.M{"_id": 0, "from": 1}, returned: 16, sort: bson.D{{Key: "from", Value: 1}}, limit: 16},
+		{name: "outgoing_page", collection: "pending_friend_requests", filter: bson.M{"from": ids[0], "to": bson.M{"$gt": ids[0]}}, projection: bson.M{"_id": 0, "to": 1}, returned: 16, sort: bson.D{{Key: "to", Value: 1}}, limit: 16},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			find := bson.D{{Key: "find", Value: tc.collection}, {Key: "filter", Value: tc.filter}}
 			if tc.projection != nil {
 				find = append(find, bson.E{Key: "projection", Value: tc.projection})
+			}
+			if tc.limit > 0 {
+				find = append(find, bson.E{Key: "limit", Value: tc.limit}, bson.E{Key: "sort", Value: tc.sort})
 			}
 			//nolint:tagliatelle // MongoDB explain responses have fixed camelCase field names.
 			var result struct {
@@ -88,6 +95,9 @@ func TestMongoHotQueriesUseIndexes(t *testing.T) {
 			stats := result.ExecutionStats
 			if strings.Contains(string(plan), "COLLSCAN") || stats.Keys == 0 || stats.Documents > tc.returned || stats.Returned != tc.returned {
 				t.Fatalf("query is not selective: stats=%+v plan=%s", stats, plan)
+			}
+			if tc.limit > 0 && (stats.Keys > tc.limit || strings.Contains(string(plan), `"stage":"SORT"`)) {
+				t.Fatalf("paged query must use a bounded index range without a blocking sort: stats=%+v plan=%s", stats, plan)
 			}
 			t.Logf("returned=%d keys=%d documents=%d plan=%s", stats.Returned, stats.Keys, stats.Documents, plan)
 		})

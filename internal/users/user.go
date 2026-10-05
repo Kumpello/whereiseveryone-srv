@@ -61,6 +61,7 @@ type Adapter interface {
 
 	GetUser(ctx context.Context, userID id.ID) (User, error)
 	GetUsers(ctx context.Context, ids []id.ID) ([]User, error)
+	GetFriendPage(ctx context.Context, viewer id.ID, query FriendPageQuery) (FriendPage, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetPendingIncomingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
 	GetPendingOutgoingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
@@ -85,9 +86,10 @@ type mongoUserAdapter struct {
 	authAdapter
 	pendingFriendRequestAdapter
 
-	coll   *mongo.Collection
-	logger logger.Logger
-	timer  timer.Timer
+	coll     *mongo.Collection
+	logger   logger.Logger
+	timer    timer.Timer
+	requests *mongo.Collection
 }
 
 func NewMongoAdapter(
@@ -105,12 +107,24 @@ func NewMongoAdapter(
 		authAdapter:                 authAdapter,
 		pendingFriendRequestAdapter: pendingFriendRequestAdapter,
 		coll:                        coll,
+		requests:                    pendingFriendRequestsColl,
 		logger:                      logger,
 		timer:                       timer,
 	}
 }
 
 func (m *mongoUserAdapter) EnsureIndexes(ctx context.Context) error {
+	var topology struct {
+		SetName     string `bson:"setName"` //nolint:tagliatelle // MongoDB hello response field.
+		Message     string `bson:"msg"`
+		WireVersion int    `bson:"maxWireVersion"` //nolint:tagliatelle // MongoDB hello response field.
+	}
+	if err := m.coll.Database().RunCommand(ctx, bson.D{{Key: "hello", Value: 1}}).Decode(&topology); err != nil {
+		return fmt.Errorf("check relationship transaction support: %w", err)
+	}
+	if topology.WireVersion < 17 || (topology.SetName == "" && topology.Message != "isdbgrid") {
+		return errors.New("friend pagination and limits require MongoDB 6+ on a replica set or sharded cluster")
+	}
 	unique := options.Index().SetUnique(true)
 	userIDIdx := mongo.IndexModel{
 		Keys: bson.M{
@@ -237,27 +251,6 @@ func (m *mongoUserAdapter) UpdateStatus(ctx context.Context, userId id.ID, newSt
 	return nil
 }
 
-func (m *mongoUserAdapter) AddFriend(
-	ctx context.Context,
-	user id.ID,
-	userToObserve id.ID,
-) error {
-	filter := withUserId(user)
-
-	update := bson.M{
-		"$addToSet": bson.M{
-			"subscribed_users": userToObserve,
-		},
-	}
-
-	_, err := m.coll.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("observe user: %w", err)
-	}
-
-	return nil
-}
-
 func (m *mongoUserAdapter) SetFriendSince(
 	ctx context.Context,
 	user id.ID,
@@ -274,105 +267,6 @@ func (m *mongoUserAdapter) SetFriendSince(
 	_, err := m.coll.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("set friend since: %w", err)
-	}
-
-	return nil
-}
-
-func (m *mongoUserAdapter) SendFriendRequest(
-	ctx context.Context,
-	from id.ID,
-	to id.ID,
-) error {
-	return m.pendingFriendRequestAdapter.SendFriendRequest(ctx, from, to)
-}
-
-func (m *mongoUserAdapter) UnfriendUser(
-	ctx context.Context,
-	user id.ID,
-	userToUnfriend id.ID,
-) error {
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequestsBetween(ctx, user, userToUnfriend); err != nil {
-		return err
-	}
-
-	_, err := m.coll.BulkWrite(ctx, []mongo.WriteModel{
-		mongo.NewUpdateOneModel().
-			SetFilter(withUserId(user)).
-			SetUpdate(bson.M{
-				"$pull": bson.M{
-					"subscribed_users": userToUnfriend,
-				},
-				"$unset": bson.M{
-					friendSinceKey(userToUnfriend): "",
-				},
-			}),
-		mongo.NewUpdateOneModel().
-			SetFilter(withUserId(userToUnfriend)).
-			SetUpdate(bson.M{
-				"$pull": bson.M{
-					"subscribed_users": user,
-				},
-				"$unset": bson.M{
-					friendSinceKey(user): "",
-				},
-			}),
-	})
-	if err != nil {
-		return fmt.Errorf("remove friendship: %w", err)
-	}
-
-	return nil
-}
-
-func (m *mongoUserAdapter) AcceptFriendRequest(
-	ctx context.Context,
-	user id.ID,
-	requester id.ID,
-) error {
-	err := m.DeleteFriendRequest(ctx, user, requester)
-	if err != nil {
-		return err
-	}
-
-	friendSince := m.timer.Now()
-
-	_, err = m.coll.BulkWrite(ctx, []mongo.WriteModel{
-		mongo.NewUpdateOneModel().
-			SetFilter(withUserId(user)).
-			SetUpdate(bson.M{
-				"$addToSet": bson.M{
-					"subscribed_users": requester,
-				},
-				"$set": bson.M{
-					friendSinceKey(requester): friendSince,
-				},
-			}),
-		mongo.NewUpdateOneModel().
-			SetFilter(withUserId(requester)).
-			SetUpdate(bson.M{
-				"$addToSet": bson.M{
-					"subscribed_users": user,
-				},
-				"$set": bson.M{
-					friendSinceKey(user): friendSince,
-				},
-			}),
-	})
-	if err != nil {
-		return fmt.Errorf("accept friend request: %w", err)
-	}
-
-	return nil
-}
-
-func (m *mongoUserAdapter) RejectFriendRequest(
-	ctx context.Context,
-	user id.ID,
-	requester id.ID,
-) error {
-	if err := m.pendingFriendRequestAdapter.DeleteFriendRequestsBetween(ctx, user, requester); err != nil {
-		return err
 	}
 
 	return nil

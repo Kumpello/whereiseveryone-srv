@@ -17,6 +17,10 @@ services:
     restart: unless-stopped
     env_file:
       - secrets.env
+    environment:
+      MONGODB_REPLICA_SET_MODE: primary
+      MONGODB_REPLICA_SET_NAME: rs0
+      MONGODB_ADVERTISED_HOSTNAME: mongodb
     volumes:
       - mongodb_data:/bitnami/mongodb
 

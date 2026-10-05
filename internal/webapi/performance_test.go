@@ -1,6 +1,7 @@
 package webapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -129,6 +132,43 @@ func performanceRequest(ctx context.Context, e *echo.Echo, method, path, token, 
 	return response
 }
 
+type friendListPage struct {
+	Items      []map[string]json.RawMessage `json:"items"`
+	NextCursor *string                      `json:"next_cursor"`
+}
+
+func fixtureFriendPage(viewer users.User, members map[id.ID]users.User, incoming, outgoing []id.ID, query users.FriendPageQuery) users.FriendPage {
+	ids := viewer.SubscribedUsers
+	switch query.State {
+	case users.FriendListAccepted:
+	case users.FriendListIncoming:
+		ids = incoming
+	case users.FriendListOutgoing:
+		ids = outgoing
+	}
+	ids = slices.Clone(ids)
+	slices.SortFunc(ids, func(a, b id.ID) int { return bytes.Compare(a[:], b[:]) })
+	ids = slices.DeleteFunc(ids, func(peer id.ID) bool { return bytes.Compare(peer[:], query.After[:]) <= 0 })
+	page := users.FriendPage{Entries: make([]users.FriendEntry, 0)}
+	if len(ids) > query.Limit {
+		ids = ids[:query.Limit]
+		page.NextID = ids[len(ids)-1]
+	}
+	for _, peer := range ids {
+		entry := users.FriendEntry{User: members[peer]}
+		if query.State == users.FriendListAccepted {
+			entry.FriendSince = viewer.FriendSinceFor(peer)
+		}
+		page.Entries = append(page.Entries, entry)
+	}
+	return page
+}
+
+func (s *performanceStore) GetFriendPage(_ context.Context, _ id.ID, query users.FriendPageQuery) (users.FriendPage, error) {
+	s.listReads.Add(1)
+	return fixtureFriendPage(s.user, s.members, s.incoming, s.outgoing, query), nil
+}
+
 func TestFriendListQueriesRemainBatched(t *testing.T) {
 	for _, count := range []int{0, 10, 1000} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
@@ -137,12 +177,14 @@ func TestFriendListQueriesRemainBatched(t *testing.T) {
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d: %s", response.Code, response.Body.String())
 			}
-			var entries []json.RawMessage
-			if err := json.Unmarshal(response.Body.Bytes(), &entries); err != nil {
+			var page friendListPage
+			if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
 				t.Fatal(err)
 			}
-			if len(entries) != 3*count || store.sessionReads.Load() != 1 || store.userReads.Load() != 1 || store.batchReads.Load() != 3 || store.listReads.Load() != 2 {
-				t.Fatalf("entries=%d, session reads=%d, full user reads=%d, batch reads=%d, pending reads=%d", len(entries), store.sessionReads.Load(), store.userReads.Load(), store.batchReads.Load(), store.listReads.Load())
+			if len(page.Items) != min(count, users.MaxFriendPageSize) || store.sessionReads.Load() != 1 ||
+				store.userReads.Load() != 0 || store.batchReads.Load() != 0 || store.listReads.Load() != 1 {
+				t.Fatalf("entries=%d, session reads=%d, full user reads=%d, batch reads=%d, page reads=%d",
+					len(page.Items), store.sessionReads.Load(), store.userReads.Load(), store.batchReads.Load(), store.listReads.Load())
 			}
 		})
 	}
@@ -174,16 +216,23 @@ func TestFriendListPreservesGroupsWithEmptyResults(t *testing.T) {
 				store.members[pausedID] = paused
 			}
 
-			response := performanceRequest(t.Context(), e, http.MethodGet, "/me/friends", store.user.Auth.Token, "")
-			if response.Code != http.StatusOK {
-				t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+			entries := make([]map[string]json.RawMessage, 0)
+			for _, state := range []string{"accepted", "pending_incoming", "pending_outgoing"} {
+				response := performanceRequest(t.Context(), e, http.MethodGet, "/me/friends?state="+state, store.user.Auth.Token, "")
+				if response.Code != http.StatusOK {
+					t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+				}
+				var page friendListPage
+				if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
+					t.Fatal(err)
+				}
+				if page.Items == nil || page.NextCursor != nil {
+					t.Fatal("small page must contain an array and no continuation")
+				}
+				entries = append(entries, page.Items...)
 			}
-			var entries []map[string]json.RawMessage
-			if err := json.Unmarshal(response.Body.Bytes(), &entries); err != nil {
-				t.Fatal(err)
-			}
-			if entries == nil || len(entries) != tc.accepted+tc.incoming+tc.outgoing {
-				t.Fatalf("entries = %s, want %d entries in a JSON array", response.Body.String(), tc.accepted+tc.incoming+tc.outgoing)
+			if len(entries) != tc.accepted+tc.incoming+tc.outgoing {
+				t.Fatal("relationship counts changed")
 			}
 
 			index := 0
@@ -226,60 +275,69 @@ func TestFriendListPreservesGroupsWithEmptyResults(t *testing.T) {
 
 type canceledFriendsStore struct {
 	*performanceStore
-	started chan struct{}
-	done    chan error
+	ctx context.Context
 }
 
-func (s *canceledFriendsStore) GetUsers(ctx context.Context, _ []id.ID) ([]users.User, error) {
-	s.started <- struct{}{}
-	<-ctx.Done()
-	s.done <- ctx.Err()
-	return nil, fmt.Errorf("friends load canceled: %w", ctx.Err())
-}
-
-func (s *canceledFriendsStore) GetPendingOutgoingFriendRequestUserIDs(ctx context.Context, _ id.ID) ([]id.ID, error) {
-	s.started <- struct{}{}
-	<-ctx.Done()
-	s.done <- ctx.Err()
-	return nil, fmt.Errorf("outgoing load canceled: %w", ctx.Err())
-}
-
-func (s *canceledFriendsStore) GetPendingIncomingFriendRequestUserIDs(ctx context.Context, _ id.ID) ([]id.ID, error) {
-	for range 2 {
-		select {
-		case <-s.started:
-		case <-ctx.Done():
-			return nil, fmt.Errorf("incoming load canceled: %w", ctx.Err())
-		}
-	}
-	return nil, errors.New("pending read failed")
+func (s *canceledFriendsStore) GetFriendPage(ctx context.Context, _ id.ID, _ users.FriendPageQuery) (users.FriendPage, error) {
+	s.ctx = ctx
+	return users.FriendPage{}, errors.New("friend page failed")
 }
 
 func TestFriendListFailureCancelsOutstandingLoads(t *testing.T) {
 	e, store := newPerformanceApp(t, 1, 0, logrus.InfoLevel)
-	failing := &canceledFriendsStore{store, make(chan struct{}, 2), make(chan error, 2)}
+	failing := &canceledFriendsStore{performanceStore: store}
 	me.NewMux(failing, &sessionClock{time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)}).Route(e.Group("/failure"), nil)
-	// This route bypasses the production authentication middleware only to inject claims.
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			c.Set("user", jwt.SignedToken{ID: store.user.ID.Hex()})
-			return next(c)
-		}
+		return func(c *echo.Context) error { c.Set("user", jwt.SignedToken{ID: store.user.ID.Hex()}); return next(c) }
 	})
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	response := performanceRequest(ctx, e, http.MethodGet, "/failure/friends", "", "")
+	response := performanceRequest(t.Context(), e, http.MethodGet, "/failure/friends", "", "")
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d", response.Code)
 	}
-	for range 2 {
-		select {
-		case err := <-failing.done:
-			if !errors.Is(err, context.Canceled) {
-				t.Fatalf("outstanding load error = %v, want immediate cancellation", err)
+	if failing.ctx == nil || !errors.Is(failing.ctx.Err(), context.Canceled) {
+		t.Fatal("failed page did not release its request context")
+	}
+}
+
+func TestHTTPFriendPageTraversal(t *testing.T) {
+	e, store := newPerformanceApp(t, 123, 1024, logrus.InfoLevel)
+	for _, state := range []string{"accepted", "pending_incoming", "pending_outgoing"} {
+		cursor := ""
+		seen := make(map[string]bool)
+		for {
+			response := performanceRequest(t.Context(), e, http.MethodGet,
+				"/me/friends?state="+state+"&limit=50&cursor="+url.QueryEscape(cursor), store.user.Auth.Token, "")
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d", response.Code)
 			}
-		case <-ctx.Done():
-			t.Fatal("outstanding loads did not stop when the handler returned")
+			var page friendListPage
+			if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if len(page.Items) > users.MaxFriendPageSize {
+				t.Fatal("page exceeded maximum size")
+			}
+			for _, entry := range page.Items {
+				var username string
+				if err := json.Unmarshal(entry["username"], &username); err != nil {
+					t.Fatal(err)
+				}
+				if seen[username] {
+					t.Fatal("duplicate entry across pages")
+				}
+				seen[username] = true
+				assertFriendVisibility(t, entry, state, strings.Repeat("s", 1024), state == "accepted")
+			}
+			if page.NextCursor == nil {
+				break
+			}
+			if *page.NextCursor == cursor {
+				t.Fatal("cursor did not advance")
+			}
+			cursor = *page.NextCursor
+		}
+		if len(seen) != 123 {
+			t.Fatalf("traversal returned %d entries", len(seen))
 		}
 	}
 }

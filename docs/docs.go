@@ -287,6 +287,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
+                    "409": {
+                        "description": "friend or pending request limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
                     "413": {
                         "description": "request body exceeds 16 KiB",
                         "schema": {
@@ -392,8 +398,11 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/me.friendDetails"
+                        }
                     },
                     "400": {
                         "description": "invalid request",
@@ -409,6 +418,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "requested user not exists",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "409": {
+                        "description": "friend or pending request limit reached",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
@@ -500,7 +515,7 @@ const docTemplate = `{
         },
         "/me/friends": {
             "get": {
-                "description": "returns friends and pending requests; pending entries omit status and location",
+                "description": "One bounded relationship page. Pending entries omit status and location.",
                 "produces": [
                     "application/json"
                 ],
@@ -508,14 +523,46 @@ const docTemplate = `{
                     "me"
                 ],
                 "summary": "get friends details",
+                "parameters": [
+                    {
+                        "enum": [
+                            "accepted",
+                            "pending_incoming",
+                            "pending_outgoing"
+                        ],
+                        "type": "string",
+                        "default": "accepted",
+                        "description": "list",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "opaque next_cursor from the preceding page",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/me.friendDetails"
-                            }
+                            "$ref": "#/definitions/me.getFriendsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
                         }
                     },
                     "401": {
@@ -964,6 +1011,20 @@ const docTemplate = `{
                 "friendStatePendingIncoming",
                 "friendStatePendingOutgoing"
             ]
+        },
+        "me.getFriendsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/me.friendDetails"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
         },
         "me.locationDetails": {
             "type": "object",

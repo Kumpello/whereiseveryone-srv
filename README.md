@@ -144,8 +144,8 @@ and device-conflict revocation clear this grace period immediately. The grace pe
 does not permit reuse of refresh tokens or extend JWT expiration. Requests already
 authorized may finish.
 
-Run the database rotation regression tests against an isolated MongoDB instance with
-`MONGO_TEST_URI=mongodb://127.0.0.1:27028 go test -race ./internal/users`.
+Run database regression tests against an isolated replica set with
+`MONGO_TEST_URI='mongodb://127.0.0.1:27028/?replicaSet=rs0&directConnection=true' go test -race ./internal/users`.
 
 When an access token expires, renew the pair with `/auth/refresh` or log in again using
 `/auth/login`. Expired tokens return 401; wrong-purpose or revoked tokens return 403.
@@ -255,6 +255,61 @@ Put it in `.env` and generate `./.env/cloud.json` from the cloud template using
 `initConfig` above. Set the Atlas hostname and certificate path in the generated file.
 
 # Documentation
+
+Friend lists (`GET /me/friends`) are independently paginated by `state`:
+`accepted` (the default), `pending_incoming`, or `pending_outgoing`. `limit`
+defaults to 50 and must be between 1 and 50. Responses are now objects rather
+than the previous combined array:
+
+```json
+{"items":[{"username":"alice","status":"","state":"accepted","friend_since":null}],"next_cursor":null}
+```
+
+Pass a non-null `next_cursor` unchanged as the `cursor` query parameter for the
+same authenticated account and state. A null cursor marks the final page.
+Malformed parameters, invalid cursors, and cursors from another account or state
+return 400 before database reads. Peer IDs define stable ascending ordering;
+unchanged lists can be traversed without duplicates or omissions. Traversal is
+not a snapshot across requests, so a relationship changed during loading may move
+between lists. Pending entries still omit status and location. MongoDB sends at
+most `limit + 1` relationship IDs and at most `limit` peer documents per page;
+accepted friendship timestamps are projected only for those IDs.
+
+Each account may have **2,048 accepted friends**, **256 incoming requests**, and
+**256 outgoing requests**. Sending checks both users' accepted capacity, the
+sender's outgoing capacity, and the recipient's incoming capacity. Acceptance
+checks both users' accepted capacity. Exceeding a limit returns 409. Repeating
+an existing pending request is a no-op even at the pending limit. A failed
+acceptance preserves the request and both users' friend lists. Accepting clears
+any reverse pending request; rejecting, removing, and accepting requests free
+their pending slots. Removing a friend frees both accepted slots.
+
+These mutations run in MongoDB transactions and serialize on both user documents
+with an internal `relationships_version` field, preventing concurrent or
+multi-server calls from exceeding a cap. The field is created lazily; no data
+migration or counters are required. Existing over-limit lists are retained and
+remain pageable, but cannot grow further until below the limit. The added
+`{to: 1, from: 1}` index supports bounded, sorted incoming-request pages; server
+startup and the `mongoIndexes` CLI create it. The existing unique `{from: 1, to: 1}`
+index supports outgoing pages.
+
+**Rollout:** Deploy the coordinated Android update with this response change.
+Android loads every page in each state before publishing or replacing its cache;
+any page failure preserves the cache. It deduplicates users whose relationships
+move while loading and handles 409 with a capacity message. Older Android versions
+expect an array and require an update before using this server version.
+
+The server now requires **MongoDB 6+ on a replica set or sharded cluster** for
+pagination and atomic relationship updates. A standalone MongoDB server cannot
+run these transactions. Convert an existing standalone deployment to a replica
+set before rollout, retaining its volume and data. Compose configures a primary
+named `rs0`; add a privately generated `MONGODB_REPLICA_SET_KEY` to ignored
+`secrets.env` alongside the existing MongoDB credentials. Ensure the application
+URI selects the replica set and its advertised host is reachable. For an existing
+volume, verify that the replica set is initialized and writable before starting
+the API; never delete the volume to change topology. Atlas replica sets already
+support transactions. Test containers should also run with `--replSet rs0` and
+be initialized before the regression suite.
 
 Location uploads (`PUT /me/location`) require `last_update` as a positive integer
 in Unix milliseconds (UTC), representing when the fix was measured. The server

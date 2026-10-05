@@ -28,6 +28,14 @@ type friendPrivacyStore struct {
 	outgoing  []id.ID
 }
 
+func (s *friendPrivacyStore) GetFriendPage(_ context.Context, _ id.ID, query users.FriendPageQuery) (users.FriendPage, error) {
+	s.friendsMu.Lock()
+	defer s.friendsMu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return fixtureFriendPage(s.user, s.members, s.incoming, s.outgoing, query), nil
+}
+
 func (s *friendPrivacyStore) GetUsers(_ context.Context, userIDs []id.ID) ([]users.User, error) {
 	s.friendsMu.Lock()
 	defer s.friendsMu.Unlock()
@@ -119,14 +127,19 @@ func TestHTTPPendingFriendRequestsOmitStatus(t *testing.T) {
 	wantLocations := map[string]bool{accepted.Auth.Username: true}
 	checkFriends := func() {
 		t.Helper()
-		listResponse := a.request(http.MethodGet, "/me/friends", token, "")
-		if listResponse.Code != http.StatusOK {
-			t.Fatalf("list friends status = %d: %s", listResponse.Code, listResponse.Body.String())
+		entries := make([]map[string]json.RawMessage, 0)
+		for _, state := range []string{"accepted", "pending_incoming", "pending_outgoing"} {
+			listResponse := a.request(http.MethodGet, "/me/friends?state="+state, token, "")
+			if listResponse.Code != http.StatusOK {
+				t.Fatalf("list friends status = %d: %s", listResponse.Code, listResponse.Body.String())
+			}
+			var page friendListPage
+			if err := json.Unmarshal(listResponse.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			entries = append(entries, page.Items...)
 		}
-		var entries []map[string]json.RawMessage
-		if err := json.Unmarshal(listResponse.Body.Bytes(), &entries); err != nil {
-			t.Fatal(err)
-		}
+
 		if len(entries) != len(wantStates) {
 			t.Fatalf("friend count = %d, want %d", len(entries), len(wantStates))
 		}
