@@ -1,0 +1,14 @@
+goos: linux
+goarch: amd64
+pkg: whereiseveryone/internal/webapi
+cpu: AMD Ryzen 5 5600H with Radeon Graphics
+BenchmarkHTTPFriends/each_group=0/status=32-12         	    1298	     79899 ns/op	        32.00 response_B	   13652 B/op	     107 allocs/op
+BenchmarkHTTPFriends/each_group=0/status=1024-12       	    1801	     76244 ns/op	        32.00 response_B	   13661 B/op	     107 allocs/op
+BenchmarkHTTPFriends/each_group=10/status=32-12        	     945	    116638 ns/op	      1951 response_B	   28944 B/op	     194 allocs/op
+BenchmarkHTTPFriends/each_group=10/status=1024-12      	     771	    160857 ns/op	     11871 response_B	   40302 B/op	     195 allocs/op
+BenchmarkHTTPFriends/each_group=100/status=32-12       	     458	    256498 ns/op	      9781 response_B	   84812 B/op	     526 allocs/op
+BenchmarkHTTPFriends/each_group=100/status=1024-12     	     256	    471447 ns/op	     59381 response_B	  162387 B/op	     529 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=32-12      	     386	    286413 ns/op	      9781 response_B	   95725 B/op	     526 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12    	     247	    440484 ns/op	     59381 response_B	  154454 B/op	     525 allocs/op
+PASS
+ok  	whereiseveryone/internal/webapi	1.000s
