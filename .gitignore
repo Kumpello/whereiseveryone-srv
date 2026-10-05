@@ -1,3 +1,5 @@
 .idea/
 /AGENTS.md
 /secrets.env
+docs/performance-review.md
+docs/performance-benchmarks.txt

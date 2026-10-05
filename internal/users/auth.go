@@ -14,6 +14,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Auth struct {
@@ -37,6 +38,8 @@ type Auth struct {
 }
 
 type authAdapter interface {
+	// GetSession reads only the credentials needed to validate an access session.
+	GetSession(ctx context.Context, userID id.ID) (Auth, error)
 	// UpdateTokens update user tokens (if they are not nil)
 	UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken, deviceToken *string) error
 	// ReplaceTokens consumes exactly the session that was read by the caller.
@@ -46,6 +49,13 @@ type authAdapter interface {
 var ErrSessionChanged = errors.New("session changed or refresh token already consumed")
 
 const AccessRotationGrace = 120 * time.Second
+
+const (
+	accessTokenField              = "auth.token"
+	deviceTokenField              = "auth.device_token" // #nosec G101 -- MongoDB field name, not a credential.
+	previousAccessDigestField     = "auth.previous_access_digest"
+	previousAccessValidUntilField = "auth.previous_access_valid_until"
+)
 
 // TokenDigest hashes a high-entropy signed credential for storage.
 func TokenDigest(token string) string {
@@ -79,16 +89,33 @@ type mongoAuthAdapter struct {
 	logger logger.Logger
 }
 
+func (m mongoAuthAdapter) GetSession(ctx context.Context, userID id.ID) (Auth, error) {
+	opts := options.FindOne().SetProjection(bson.M{
+		idField:                       0,
+		accessTokenField:              1,
+		deviceTokenField:              1,
+		previousAccessDigestField:     1,
+		previousAccessValidUntilField: 1,
+	})
+	var session struct {
+		Auth Auth `bson:"auth"`
+	}
+	if err := m.coll.FindOne(ctx, withUserId(userID), opts).Decode(&session); err != nil {
+		return Auth{}, fmt.Errorf("get session: %w", err)
+	}
+	return session.Auth, nil
+}
+
 func (m mongoAuthAdapter) UpdateTokens(ctx context.Context, userID id.ID, token, refreshedToken, deviceToken *string) error {
 	tokens := bson.D{}
 	if token != nil {
-		tokens = append(tokens, bson.E{Key: "auth.token", Value: *token})
+		tokens = append(tokens, bson.E{Key: accessTokenField, Value: *token})
 	}
 	if refreshedToken != nil {
 		tokens = append(tokens, bson.E{Key: "auth.refresh_token_digest", Value: TokenDigest(*refreshedToken)})
 	}
 	if deviceToken != nil {
-		tokens = append(tokens, bson.E{Key: "auth.device_token", Value: *deviceToken})
+		tokens = append(tokens, bson.E{Key: deviceTokenField, Value: *deviceToken})
 	}
 	if len(tokens) == 0 {
 		// nothing to update
@@ -97,7 +124,7 @@ func (m mongoAuthAdapter) UpdateTokens(ctx context.Context, userID id.ID, token,
 
 	tokens = append(tokens, bson.E{Key: "auth.updated_at", Value: m.timer.Now()})
 	filter := withUserId(userID)
-	unset := bson.M{"auth.previous_access_digest": "", "auth.previous_access_valid_until": ""}
+	unset := bson.M{previousAccessDigestField: "", previousAccessValidUntilField: ""}
 	update := bson.M{
 		"$set":   tokens,
 		"$unset": unset,
@@ -119,8 +146,8 @@ func (m mongoAuthAdapter) UpdateTokens(ctx context.Context, userID id.ID, token,
 
 func (m mongoAuthAdapter) ReplaceTokens(ctx context.Context, userID id.ID, previous Auth, token, refresh, device string) error {
 	filter := withUserId(userID)
-	filter["auth.token"] = previous.Token
-	filter["auth.device_token"] = previous.DeviceToken
+	filter[accessTokenField] = previous.Token
+	filter[deviceTokenField] = previous.DeviceToken
 	if previous.RefreshTokenDigest != "" {
 		filter["auth.refresh_token_digest"] = previous.RefreshTokenDigest
 	} else {
@@ -130,18 +157,18 @@ func (m mongoAuthAdapter) ReplaceTokens(ctx context.Context, userID id.ID, previ
 	}
 	now := m.timer.Now()
 	set := bson.M{
-		"auth.token":                token,
+		accessTokenField:            token,
 		"auth.refresh_token_digest": TokenDigest(refresh),
-		"auth.device_token":         device,
+		deviceTokenField:            device,
 		"auth.updated_at":           now,
 	}
 	unset := bson.M{"auth.refresh_token": ""}
 	if device != "" && device == previous.DeviceToken {
-		set["auth.previous_access_digest"] = TokenDigest(previous.Token)
-		set["auth.previous_access_valid_until"] = now.Add(AccessRotationGrace)
+		set[previousAccessDigestField] = TokenDigest(previous.Token)
+		set[previousAccessValidUntilField] = now.Add(AccessRotationGrace)
 	} else {
-		unset["auth.previous_access_digest"] = ""
-		unset["auth.previous_access_valid_until"] = ""
+		unset[previousAccessDigestField] = ""
+		unset[previousAccessValidUntilField] = ""
 	}
 	result, err := m.coll.UpdateOne(ctx, filter, bson.M{"$set": set, "$unset": unset})
 	if err != nil {

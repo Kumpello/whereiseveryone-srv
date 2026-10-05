@@ -37,11 +37,27 @@ type sessionStore struct {
 	user          users.User
 	getError      error
 	reads         int
+	sessionReads  int
+	userReads     int
 }
 
 func (s *sessionStore) GetUser(ctx context.Context, userID id.ID) (users.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.userReads++
+	return s.readUser(ctx, userID)
+}
+
+func (s *sessionStore) GetSession(ctx context.Context, userID id.ID) (users.Auth, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionReads++
+	user, err := s.readUser(ctx, userID)
+	return user.Auth, err
+}
+
+// readUser requires s.mu to be held by the caller.
+func (s *sessionStore) readUser(ctx context.Context, userID id.ID) (users.User, error) {
 	s.reads++
 	if _, ok := ctx.Deadline(); !ok {
 		return users.User{}, errors.New("session lookup requires a deadline")
@@ -223,13 +239,28 @@ func TestProtectedRoutesRequireCurrentAccessToken(t *testing.T) {
 			if tc.wantCode == 204 {
 				wantCalls = 1
 			}
-			if a.probe.calls != wantCalls || a.store.reads != tc.wantReads {
-				t.Fatalf("handler calls = %d, reads = %d", a.probe.calls, a.store.reads)
+			if a.probe.calls != wantCalls || a.store.sessionReads != tc.wantReads || a.store.userReads != 0 {
+				t.Fatalf("handler calls = %d, session reads = %d, full user reads = %d", a.probe.calls, a.store.sessionReads, a.store.userReads)
 			}
 			if strings.Contains(res.Body.String(), "private database") {
 				t.Fatal("session-store error leaked to response")
 			}
 		})
+	}
+}
+
+func TestProtectedRoutesObserveSessionRevocationOnNextRequest(t *testing.T) {
+	a := newSessionApp(t)
+	token := a.store.user.Auth.Token
+	if res := a.request(http.MethodGet, "/me/probe", token, ""); res.Code != http.StatusNoContent {
+		t.Fatalf("current access status = %d", res.Code)
+	}
+	a.store.user.Auth.Token = ""
+	if res := a.request(http.MethodGet, "/me/probe", token, ""); res.Code != http.StatusForbidden {
+		t.Fatalf("revoked access status = %d", res.Code)
+	}
+	if a.probe.calls != 1 || a.store.sessionReads != 2 || a.store.userReads != 0 {
+		t.Fatalf("handler calls = %d, session reads = %d, full user reads = %d", a.probe.calls, a.store.sessionReads, a.store.userReads)
 	}
 }
 

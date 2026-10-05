@@ -1,0 +1,33 @@
+Step 2 session-reader benchmark, 2026-10-05.
+Go 1.27.1, Linux amd64, AMD Ryzen 5 5600H, GOMAXPROCS=12.
+Isolated standalone mongo:7 on localhost:27028.
+Three runs per case, without race instrumentation, after tests and lint finished.
+projected=false calls GetUser; projected=true calls the production GetSession.
+
+Command:
+MONGO_TEST_URI=mongodb://127.0.0.1:27028 go test -p=1 -run '^$' -bench '^BenchmarkMongoSessionRead$' -benchmem -benchtime=200ms -count=3 ./internal/users
+
+goos: linux
+goarch: amd64
+pkg: whereiseveryone/internal/users
+cpu: AMD Ryzen 5 5600H with Radeon Graphics         
+BenchmarkMongoSessionRead/friends=0/projected=false-12         	     319	    729967 ns/op	       213.0 stored_user_B	   12891 B/op	     120 allocs/op
+BenchmarkMongoSessionRead/friends=0/projected=false-12         	     316	    713254 ns/op	       213.0 stored_user_B	   12805 B/op	     120 allocs/op
+BenchmarkMongoSessionRead/friends=0/projected=false-12         	     332	    749894 ns/op	       213.0 stored_user_B	   12802 B/op	     120 allocs/op
+BenchmarkMongoSessionRead/friends=0/projected=true-12          	     304	    793514 ns/op	       213.0 stored_user_B	   13695 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=0/projected=true-12          	     303	    800415 ns/op	       213.0 stored_user_B	   13756 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=0/projected=true-12          	     309	    782229 ns/op	       213.0 stored_user_B	   13681 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=false-12      	      87	   2322195 ns/op	     68022 stored_user_B	  574393 B/op	    9178 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=false-12      	     103	   2327108 ns/op	     68022 stored_user_B	  574429 B/op	    9178 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=false-12      	     102	   2329886 ns/op	     68022 stored_user_B	  574444 B/op	    9178 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=true-12       	     297	    782064 ns/op	     68022 stored_user_B	   13664 B/op	     121 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=true-12       	     292	    786393 ns/op	     68022 stored_user_B	   13713 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=1000/projected=true-12       	     292	    795453 ns/op	     68022 stored_user_B	   13681 B/op	     121 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=false-12     	      15	  14703756 ns/op	    698022 stored_user_B	 6010004 B/op	   90255 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=false-12     	      14	  15623850 ns/op	    698022 stored_user_B	 6009870 B/op	   90256 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=false-12     	      15	  15125150 ns/op	    698022 stored_user_B	 6009832 B/op	   90256 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=true-12      	     300	    784827 ns/op	    698022 stored_user_B	   13715 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=true-12      	     303	    786461 ns/op	    698022 stored_user_B	   13680 B/op	     122 allocs/op
+BenchmarkMongoSessionRead/friends=10000/projected=true-12      	     302	    785864 ns/op	    698022 stored_user_B	   13719 B/op	     122 allocs/op
+PASS
+ok  	whereiseveryone/internal/users	5.149s

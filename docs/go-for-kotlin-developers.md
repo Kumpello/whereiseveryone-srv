@@ -156,7 +156,8 @@ The application depends on abstractions where substitution is useful:
 - `timer.Timer` allows real and fake clocks.
 - `env.Handler` allows JSON-file and OS-environment configuration.
 - `users.Adapter` separates handlers from MongoDB implementation details.
-- `webapi.SessionReader` exposes only the user lookup needed by authentication.
+- `webapi.SessionReader` exposes `GetSession`, which reads only the credentials
+  needed by authentication. Full user reads remain available to other handlers.
 
 `SessionReader` is a particularly useful pattern: the consumer asks for the small interface it needs. The same Mongo adapter can satisfy both a broad persistence interface and this smaller interface.
 

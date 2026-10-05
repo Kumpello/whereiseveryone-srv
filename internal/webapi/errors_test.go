@@ -39,6 +39,13 @@ func (s *errorStore) GetUser(ctx context.Context, userID id.ID) (users.User, err
 	return s.sessionStore.GetUser(ctx, userID)
 }
 
+func (s *errorStore) GetSession(ctx context.Context, userID id.ID) (users.Auth, error) {
+	if s.failSession {
+		return users.Auth{}, s.failure
+	}
+	return s.sessionStore.GetSession(ctx, userID)
+}
+
 func (s *errorStore) GetUserByUsername(_ context.Context, _ string) (users.User, error) {
 	return users.User{}, s.failure
 }

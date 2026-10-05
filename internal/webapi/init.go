@@ -66,7 +66,7 @@ type EchoRouters struct {
 
 // SessionReader provides the current persisted credentials for session revocation checks.
 type SessionReader interface {
-	GetUser(ctx context.Context, userID id.ID) (users.User, error)
+	GetSession(ctx context.Context, userID id.ID) (users.Auth, error)
 }
 
 func NewEcho(
@@ -110,7 +110,7 @@ func NewEcho(
 				return c.String(http.StatusForbidden, "invalid token")
 			}
 			ctx, cancel := context.WithTimeout(c.Request().Context(), sessionLookupTimeout)
-			user, err := sessions.GetUser(ctx, userID)
+			session, err := sessions.GetSession(ctx, userID)
 			cancel()
 			if err != nil {
 				if errors.Is(err, users.ErrUserNotExists) {
@@ -119,8 +119,8 @@ func NewEcho(
 				return jsonerr.EchoInternalError(err).Echo(c)
 			}
 			// Refresh preserves the previous access token for a bounded grace period.
-			if strings.TrimSpace(user.Auth.DeviceToken) == "" ||
-				!user.Auth.MatchesAccess(signed, jwtInstance.Now()) {
+			if strings.TrimSpace(session.DeviceToken) == "" ||
+				!session.MatchesAccess(signed, jwtInstance.Now()) {
 				return c.String(http.StatusForbidden, "invalid session")
 			}
 			c.Set("user", v)

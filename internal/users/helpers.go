@@ -6,12 +6,13 @@ import (
 )
 
 const (
+	idField          = "_id"
 	locationField    = "location"
 	pausedUsersField = "paused_users"
 )
 
 func withUserId(id id.ID) bson.M {
 	return bson.M{
-		"_id": id,
+		idField: id,
 	}
 }
