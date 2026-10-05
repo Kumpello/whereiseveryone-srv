@@ -95,37 +95,36 @@ func (m *mux) getFriends(c *echo.Context) error {
 	}
 
 	type friendsLoad struct {
-		friends       []users.User
-		incomingUsers []users.User
-		outgoingUsers []users.User
-		err           error
+		state friendState
+		users []users.User
+		err   error
 	}
 
 	loads := make(chan friendsLoad, 3)
 
 	go func() {
 		friends, err := m.userAdapter.GetUsers(ctx, user.SubscribedUsers)
-		loads <- friendsLoad{friends: friends, err: err}
+		loads <- friendsLoad{state: friendStateAccepted, users: friends, err: err}
 	}()
 
 	go func() {
 		incomingUserIDs, err := m.userAdapter.GetPendingIncomingFriendRequestUserIDs(ctx, user.ID)
 		if err != nil {
-			loads <- friendsLoad{err: err}
+			loads <- friendsLoad{state: friendStatePendingIncoming, err: err}
 			return
 		}
 		incomingUsers, err := m.userAdapter.GetUsers(ctx, incomingUserIDs)
-		loads <- friendsLoad{incomingUsers: incomingUsers, err: err}
+		loads <- friendsLoad{state: friendStatePendingIncoming, users: incomingUsers, err: err}
 	}()
 
 	go func() {
 		outgoingUserIDs, err := m.userAdapter.GetPendingOutgoingFriendRequestUserIDs(ctx, user.ID)
 		if err != nil {
-			loads <- friendsLoad{err: err}
+			loads <- friendsLoad{state: friendStatePendingOutgoing, err: err}
 			return
 		}
 		outgoingUsers, err := m.userAdapter.GetUsers(ctx, outgoingUserIDs)
-		loads <- friendsLoad{outgoingUsers: outgoingUsers, err: err}
+		loads <- friendsLoad{state: friendStatePendingOutgoing, users: outgoingUsers, err: err}
 	}()
 
 	var friends []users.User
@@ -136,9 +135,14 @@ func (m *mux) getFriends(c *echo.Context) error {
 		if load.err != nil {
 			return jsonerr.EchoInternalError(load.err).Echo(c)
 		}
-		friends = append(friends, load.friends...)
-		incomingUsers = append(incomingUsers, load.incomingUsers...)
-		outgoingUsers = append(outgoingUsers, load.outgoingUsers...)
+		switch load.state {
+		case friendStateAccepted:
+			friends = load.users
+		case friendStatePendingIncoming:
+			incomingUsers = load.users
+		case friendStatePendingOutgoing:
+			outgoingUsers = load.users
+		}
 	}
 
 	result := make(getFriendsResponse, 0, len(friends)+len(incomingUsers)+len(outgoingUsers))

@@ -1,0 +1,35 @@
+Step 6 friend-list slice-copy comparison, 2026-10-05.
+Go 1.27.1, Linux amd64, AMD Ryzen 5 5600H, GOMAXPROCS=12.
+1,000 entries per group, accepted statuses of 1,024 ASCII characters.
+Real HTTP handling with a simulated database and buffered response recorder.
+No race instrumentation. Before and after runs were sequential and separate from tests/lint.
+Five one-second runs for each version. The review reports medians.
+
+Command:
+go test -run '^$' -bench '^BenchmarkHTTPFriends$/each_group=1000/status=1024$' -benchmem -benchtime=1s -count=5 ./internal/webapi
+
+Before:
+goos: linux
+goarch: amd64
+pkg: whereiseveryone/internal/webapi
+cpu: AMD Ryzen 5 5600H with Radeon Graphics         
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     135	   8617305 ns/op	   1331672 response_B	 7675373 B/op	   10165 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     135	   8785549 ns/op	   1331672 response_B	 7576416 B/op	   10162 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     129	   9150074 ns/op	   1331672 response_B	 7560611 B/op	   10161 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     132	   9026523 ns/op	   1331672 response_B	 7770153 B/op	   10162 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     135	   8836011 ns/op	   1331672 response_B	 7724339 B/op	   10163 allocs/op
+PASS
+ok  	whereiseveryone/internal/webapi	6.032s
+
+After:
+goos: linux
+goarch: amd64
+pkg: whereiseveryone/internal/webapi
+cpu: AMD Ryzen 5 5600H with Radeon Graphics         
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     136	   8745942 ns/op	   1331672 response_B	 7370170 B/op	   10165 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     130	   9093370 ns/op	   1331672 response_B	 7792965 B/op	   10166 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     133	   8973974 ns/op	   1331672 response_B	 7676548 B/op	   10165 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     128	   9211159 ns/op	   1331672 response_B	 7510306 B/op	   10163 allocs/op
+BenchmarkHTTPFriends/each_group=1000/status=1024-12         	     135	   8951089 ns/op	   1331672 response_B	 7256705 B/op	   10162 allocs/op
+PASS
+ok  	whereiseveryone/internal/webapi	6.068s

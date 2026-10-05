@@ -148,6 +148,82 @@ func TestFriendListQueriesRemainBatched(t *testing.T) {
 	}
 }
 
+func TestFriendListPreservesGroupsWithEmptyResults(t *testing.T) {
+	for _, tc := range []struct {
+		name                         string
+		accepted, incoming, outgoing int
+	}{
+		{name: "all groups", accepted: 2, incoming: 1, outgoing: 2},
+		{name: "accepted empty", incoming: 1, outgoing: 2},
+		{name: "incoming empty", accepted: 2, outgoing: 1},
+		{name: "outgoing empty", accepted: 1, incoming: 2},
+		{name: "accepted only", accepted: 2},
+		{name: "incoming only", incoming: 2},
+		{name: "outgoing only", outgoing: 2},
+		{name: "all empty"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, store := newPerformanceApp(t, 2, 32, logrus.InfoLevel)
+			store.user.SubscribedUsers = store.user.SubscribedUsers[:tc.accepted]
+			store.incoming = store.incoming[:tc.incoming]
+			store.outgoing = store.outgoing[:tc.outgoing]
+			if tc.accepted > 1 {
+				pausedID := store.user.SubscribedUsers[1]
+				paused := store.members[pausedID]
+				paused.PausedUsers = []id.ID{store.user.ID}
+				store.members[pausedID] = paused
+			}
+
+			response := performanceRequest(t.Context(), e, http.MethodGet, "/me/friends", store.user.Auth.Token, "")
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+			}
+			var entries []map[string]json.RawMessage
+			if err := json.Unmarshal(response.Body.Bytes(), &entries); err != nil {
+				t.Fatal(err)
+			}
+			if entries == nil || len(entries) != tc.accepted+tc.incoming+tc.outgoing {
+				t.Fatalf("entries = %s, want %d entries in a JSON array", response.Body.String(), tc.accepted+tc.incoming+tc.outgoing)
+			}
+
+			index := 0
+			for _, group := range []struct {
+				ids   []id.ID
+				state string
+			}{
+				{store.user.SubscribedUsers, "accepted"},
+				{store.incoming, "pending_incoming"},
+				{store.outgoing, "pending_outgoing"},
+			} {
+				for i, userID := range group.ids {
+					user := store.members[userID]
+					entry := entries[index]
+					var username string
+					if err := json.Unmarshal(entry["username"], &username); err != nil {
+						t.Fatal(err)
+					}
+					if username != user.Auth.Username {
+						t.Fatalf("entry %d username = %q, want %q", index, username, user.Auth.Username)
+					}
+					assertFriendVisibility(t, entry, group.state, user.Status, group.state == "accepted" && i == 0)
+					if group.state == "accepted" {
+						var since int64
+						if err := json.Unmarshal(entry["friend_since"], &since); err != nil {
+							t.Fatal(err)
+						}
+						if since != store.user.FriendSince[userID.Hex()].UnixMilli() {
+							t.Fatalf("entry %d lost its friendship timestamp", index)
+						}
+					} else if string(entry["friend_since"]) != "null" {
+						t.Fatalf("pending entry %d exposed a friendship timestamp", index)
+					}
+					index++
+				}
+			}
+		})
+	}
+}
+
 type canceledFriendsStore struct {
 	*performanceStore
 	started chan struct{}
