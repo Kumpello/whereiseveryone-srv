@@ -17,10 +17,12 @@ const (
 // Application configuration keys; defaults apply when optional keys are omitted.
 const (
 	//nolint:gosec // not a credential
-	ConfJwtSecret               env.Key = "app.jwtSecret"               // required
-	ConfDebug                   env.Key = "app.debug"                   // required
-	ConfAppPort                 env.Key = "app.port"                    // required
-	ConfBcryptCost              env.Key = "app.bcryptCost"              // optional, default 14
-	ConfMaxConcurrentDBRequests env.Key = "app.maxConcurrentDBRequests" // optional, default 4
-	ConfDBRequestTimeoutSeconds env.Key = "app.dbRequestTimeoutSeconds" // optional, default 15
+	ConfJwtSecret  env.Key = "app.jwtSecret"  // required
+	ConfDebug      env.Key = "app.debug"      // required
+	ConfAppPort    env.Key = "app.port"       // required
+	ConfBcryptCost env.Key = "app.bcryptCost" // optional, default 14, range 4-14
+	//nolint:gosec // This key controls concurrency, not a credential.
+	ConfMaxConcurrentPasswordRequests env.Key = "app.maxConcurrentPasswordRequests" // optional, default 1
+	ConfMaxConcurrentDBRequests       env.Key = "app.maxConcurrentDBRequests"       // optional, default 4
+	ConfDBRequestTimeoutSeconds       env.Key = "app.dbRequestTimeoutSeconds"       // optional, default 15
 )

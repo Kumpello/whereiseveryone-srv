@@ -2,6 +2,8 @@
   "app.jwtSecret": "REPLACE_WITH_A_RANDOM_SECRET_GENERATED_FOR_THIS_ENVIRONMENT",
   "app.debug": "false",
   "app.port": "8080",
+  "app.bcryptCost": "14",
+  "app.maxConcurrentPasswordRequests": "1",
   "app.maxConcurrentDBRequests": "4",
   "app.dbRequestTimeoutSeconds": "15",
   "mongo.maxPoolSize": "8",

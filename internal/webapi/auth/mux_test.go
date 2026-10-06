@@ -19,6 +19,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	"whereiseveryone/internal/config"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/pkg/crypto"
@@ -358,15 +359,21 @@ func TestAdmissionHeldThroughPersistenceAndReleasedOnErrors(t *testing.T) {
 
 func TestDummyHashUsesConfiguredCost(t *testing.T) {
 	a := newAuthApp(t)
-	if err := a.m.SetPasswordHashCost(bcrypt.MinCost + 1); err != nil {
+	limits := config.PasswordWorkLimits{HashCost: bcrypt.MinCost + 1, MaxRequests: 2}
+	if err := a.m.SetPasswordWorkLimits(limits); err != nil {
 		t.Fatal(err)
+	}
+	if cap(a.m.passwordOps) != limits.MaxRequests || a.m.passwordHashCost != limits.HashCost {
+		t.Fatal("configured password cost and concurrency were not applied together")
 	}
 	if cost, err := bcrypt.Cost([]byte(a.m.dummyPasswordHash)); err != nil || cost != bcrypt.MinCost+1 {
 		t.Fatalf("dummy hash cost = %d, error = %v", cost, err)
 	}
 	before := a.m.dummyPasswordHash
-	if err := a.m.SetPasswordHashCost(bcrypt.MinCost - 1); err == nil || a.m.dummyPasswordHash != before {
-		t.Fatal("invalid cost changed authentication setup")
+	for _, cost := range []int{bcrypt.MinCost - 1, config.MaxBcryptCost + 1, bcrypt.MaxCost} {
+		if err := a.m.SetPasswordHashCost(cost); err == nil || a.m.dummyPasswordHash != before {
+			t.Fatal("invalid cost changed authentication setup")
+		}
 	}
 }
 
@@ -401,12 +408,117 @@ func TestPasswordAdmissionAndDefaultDummyCost(t *testing.T) {
 	if cost, err := bcrypt.Cost([]byte(m.dummyPasswordHash)); err != nil || cost != crypto.DefaultPasswordHashCost {
 		t.Fatalf("default dummy cost = %d, error = %v", cost, err)
 	}
-	if capacity := cap(m.passwordOps); capacity < 1 || capacity > maxPasswordOperations {
+	if capacity := cap(m.passwordOps); capacity != 1 {
 		t.Fatalf("admission capacity = %d", capacity)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if release, admitted := m.acquirePasswordSlot(ctx); admitted || release != nil || len(m.passwordOps) != 0 {
 		t.Fatal("canceled request entered password admission")
+	}
+}
+
+func TestConfiguredPasswordAdmission(t *testing.T) {
+	for _, limit := range []int{1, 2} {
+		t.Run(fmt.Sprintf("limit=%d", limit), func(t *testing.T) {
+			a := newAuthApp(t)
+			if err := a.m.SetPasswordWorkLimits(config.PasswordWorkLimits{HashCost: bcrypt.MinCost, MaxRequests: limit}); err != nil {
+				t.Fatal(err)
+			}
+			started, release := make(chan struct{}, limit), make(chan struct{})
+			unblock := sync.OnceFunc(func() { close(release) })
+			defer unblock()
+			a.store.beforeLookup = func() { started <- struct{}{}; <-release }
+			responses := make(chan *httptest.ResponseRecorder, limit)
+			body := credentials(t, "alice", "wrong")
+			for i := 0; i < limit; i++ {
+				go func() { responses <- a.request(t.Context(), "/auth/login", "192.0.2.1:1234", body) }()
+			}
+			for i := 0; i < limit; i++ {
+				select {
+				case <-started:
+				case <-time.After(2 * time.Second):
+					t.Fatal("configured number of logins did not enter lookup")
+				}
+			}
+			for _, path := range []string{"/auth/login", "/auth/signup"} {
+				requireThrottled(t, a.request(t.Context(), path, "192.0.2.2:1234", credentials(t, "new", "test-password")))
+			}
+			if int(a.store.lookups.Load()) != limit || a.store.creates.Load() != 0 {
+				t.Fatal("excess work entered lookup or signup hashing")
+			}
+			unblock()
+			for i := 0; i < limit; i++ {
+				select {
+				case response := <-responses:
+					if response.Code != http.StatusForbidden {
+						t.Fatalf("admitted login status = %d", response.Code)
+					}
+				case <-time.After(2 * time.Second):
+					t.Fatal("admitted login did not finish")
+				}
+			}
+			a.store.beforeLookup = nil
+			if response := a.request(t.Context(), "/auth/login", "192.0.2.2:1234", body); response.Code != http.StatusForbidden {
+				t.Fatalf("released slot not reused: status = %d", response.Code)
+			}
+		})
+	}
+}
+
+func TestInvalidPasswordWorkLimitsPreserveSetup(t *testing.T) {
+	m := NewMux(nil, &authClock{}, nil)
+	beforeOps, beforeHash := m.passwordOps, m.dummyPasswordHash
+	for _, limits := range []config.PasswordWorkLimits{
+		{HashCost: bcrypt.MinCost, MaxRequests: 0},
+		{HashCost: bcrypt.MinCost, MaxRequests: -1},
+		{HashCost: config.MaxBcryptCost + 1, MaxRequests: 2},
+	} {
+		if err := m.SetPasswordWorkLimits(limits); err == nil {
+			t.Fatalf("invalid limits accepted: %+v", limits)
+		}
+		if m.passwordOps != beforeOps || m.dummyPasswordHash != beforeHash || m.passwordHashCost != crypto.DefaultPasswordHashCost {
+			t.Fatal("invalid limits changed authentication setup")
+		}
+	}
+}
+
+func TestCanceledLoginKeepsPasswordSlotUntilVerificationReturns(t *testing.T) {
+	a := newAuthApp(t)
+	started, release := make(chan struct{}), make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	defer unblock()
+	signalStarted := sync.OnceFunc(func() { close(started) })
+	a.m.verifyPassword = func(hash, password string) error {
+		signalStarted()
+		<-release
+		return crypto.VerifyPassword(hash, password)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	first := make(chan *httptest.ResponseRecorder, 1)
+	body := credentials(t, "alice", "wrong")
+	go func() { first <- a.request(ctx, "/auth/login", "192.0.2.1:1234", body) }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("password verification did not start")
+	}
+	cancel()
+	requireThrottled(t, a.request(t.Context(), "/auth/signup", "192.0.2.2:1234", credentials(t, "new", "test-password")))
+	if a.store.creates.Load() != 0 {
+		t.Fatal("cancellation released a slot while password verification was still running")
+	}
+	unblock()
+	select {
+	case response := <-first:
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("canceled invalid login status = %d", response.Code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("canceled login did not finish after verification returned")
+	}
+	if response := a.request(t.Context(), "/auth/login", "192.0.2.2:1234", body); response.Code != http.StatusForbidden {
+		t.Fatalf("slot not reused after canceled verification returned: status = %d", response.Code)
 	}
 }

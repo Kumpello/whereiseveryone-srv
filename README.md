@@ -46,7 +46,8 @@ matching `.env/docker.json`.
 
 Optional performance-related config:
 
-* `app.bcryptCost` - bcrypt work factor for new password hashes. Defaults to `14`.
+* `app.bcryptCost` - bcrypt work factor for new password hashes and dummy verification. Defaults to `14`; supported range is `4`–`14`.
+* `app.maxConcurrentPasswordRequests` - shared login/signup password-work cap per instance. Defaults to `1`.
 * `app.maxConcurrentDBRequests` - shared admission cap for `/auth/*` and `/me/*`. Defaults to `4`.
 * `app.dbRequestTimeoutSeconds` - one database-work deadline per admitted request. Defaults to `15` seconds.
 * `mongo.maxPoolSize` - connection-pool cap per MongoDB server. Defaults to `8`, overriding URI `maxPoolSize`.
@@ -54,6 +55,10 @@ Optional performance-related config:
 Values in JSON configuration are strings. The new limits are optional in existing
 files; omitted keys use these defaults. Nonpositive or malformed limits reject
 startup, including `mongo.maxPoolSize=0` (which would mean unlimited in the driver).
+Malformed or out-of-range bcrypt costs also reject startup before connecting to
+MongoDB; they no longer fall back silently. Configurations with costs above `14`
+must be reviewed before rollout. The supported ceiling is a CPU budget for new
+hashes and dummy work, not a change to existing stored hashes.
 
 ## Docker - srv
 
@@ -211,9 +216,20 @@ Attempts use fixed windows starting with the first attempt:
 Source and global quotas run before binding, including invalid requests. Username
 quotas run after validation and include successful and failed attempts at existing
 and nonexistent accounts; success does not reset them. Both routes also share a
-password-work cap of `min(GOMAXPROCS, 8)`, held through lookup, bcrypt, and persistence.
+password-work cap of `app.maxConcurrentPasswordRequests` (default **one**), held
+through lookup, bcrypt, and persistence. This cap is independent of `GOMAXPROCS`.
 There is no waiting queue. Password admission saturation or an exhausted quota returns generic HTTP
 429 with `Retry-After` in seconds (one second for admission saturation).
+
+The default targets low traffic on a small server and keeps the bcrypt cost at
+`14`. It is provisional until measured on deployment hardware; limiting concurrent
+work does not reserve a CPU core. A canceled request retains its password slot
+until its work returns because bcrypt cannot be interrupted. The shared database
+request cap still applies first, so increasing the password cap above that limit
+does not admit more login/signup requests. Measure login/signup alongside location
+and friend requests with the deployed CPU limits before increasing concurrency.
+Changing bcrypt cost needs a separate password-security decision; costs above
+`14` require an explicit change to the supported ceiling and capacity review.
 
 Sources use the socket peer address and ignore forwarding headers. IPv4-mapped
 addresses share the IPv4 budget; IPv6 addresses share a `/64` budget. Behind a
@@ -222,8 +238,8 @@ limits at the trusted gateway. Limiter storage holds at most 10,000 hashed keys,
 expires entries, and rejects new keys when full without evicting active budgets.
 Limits are in memory per server instance and reset on restart; multiple replicas
 require coordinated limits at the gateway or a shared limiter for deployment-wide
-quotas. These authentication quotas do not add configuration keys, database
-migrations, or indexes.
+quotas. The attempt quotas remain fixed; only password concurrency and bcrypt cost
+are configurable. No database migration or index changes are required.
 
 ## Database work admission and temporary overload
 

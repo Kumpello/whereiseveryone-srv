@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 	"time"
 
+	"whereiseveryone/internal/config"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	maxPasswordOperations = 8
 	// This is a valid cost-14 bcrypt hash used only for dummy verification.
 	// Matching it never authenticates a nonexistent account.
 	//nolint:gosec // A public dummy hash cannot authenticate any account.
@@ -46,30 +45,35 @@ func NewMux(
 	timer timer.Timer,
 	jwt *jwt.JWT,
 ) *mux {
-	passwordOpsLimit := runtime.GOMAXPROCS(0)
-	if passwordOpsLimit < 1 {
-		passwordOpsLimit = 1
-	}
-	if passwordOpsLimit > maxPasswordOperations {
-		passwordOpsLimit = maxPasswordOperations
-	}
-
 	return &mux{
 		userAdapter:       userAdapter,
 		timer:             timer,
 		jwt:               jwt,
 		passwordHashCost:  crypto.DefaultPasswordHashCost,
-		passwordOps:       make(chan struct{}, passwordOpsLimit),
+		passwordOps:       make(chan struct{}, config.DefaultMaxConcurrentPasswordRequests),
 		dummyPasswordHash: defaultDummyPasswordHash,
 		verifyPassword:    crypto.VerifyPassword,
 		throttle:          newAuthThrottle(),
 	}
 }
 
+// SetPasswordWorkLimits configures admission and prepares the dummy hash before serving requests.
+// It must not be called while requests are being served.
+func (m *mux) SetPasswordWorkLimits(limits config.PasswordWorkLimits) error {
+	if err := limits.Validate(); err != nil {
+		return fmt.Errorf("configure password work: %w", err)
+	}
+	if err := m.SetPasswordHashCost(limits.HashCost); err != nil {
+		return err
+	}
+	m.passwordOps = make(chan struct{}, limits.MaxRequests)
+	return nil
+}
+
 // SetPasswordHashCost prepares a matching dummy hash before serving requests.
 func (m *mux) SetPasswordHashCost(cost int) error {
-	if cost < bcrypt.MinCost || cost > bcrypt.MaxCost {
-		return errors.New("invalid bcrypt cost")
+	if err := (config.PasswordWorkLimits{HashCost: cost, MaxRequests: cap(m.passwordOps)}).Validate(); err != nil {
+		return fmt.Errorf("configure password hash cost: %w", err)
 	}
 	if cost == m.passwordHashCost {
 		return nil

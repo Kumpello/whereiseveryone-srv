@@ -5,20 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 	"whereiseveryone/internal/config"
 
 	"github.com/sirupsen/logrus"
 	echoSwagger "github.com/swaggo/echo-swagger/v2"
-	"golang.org/x/crypto/bcrypt"
 
 	"whereiseveryone/internal/mongo"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	authMux "whereiseveryone/internal/webapi/auth"
 	meMux "whereiseveryone/internal/webapi/me"
-	"whereiseveryone/pkg/crypto"
 	"whereiseveryone/pkg/env"
 	"whereiseveryone/pkg/jwt"
 	"whereiseveryone/pkg/logger"
@@ -30,7 +27,6 @@ import (
 )
 
 const (
-	defaultBcryptCost    = crypto.DefaultPasswordHashCost
 	indexCreationTimeout = 30 * time.Second
 	serverReadTimeout    = 10 * time.Second
 	serverWriteTimeout   = 30 * time.Second
@@ -75,6 +71,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid database request limits: %s", err)
 	}
+	passwordLimits, err := config.PasswordWorkLimitsFromEnv(envHandler)
+	if err != nil {
+		log.Fatalf("invalid password work limits: %s", err)
+	}
 
 	isDebug := envHandler.MustEnv(config.ConfDebug) == "true"
 	if isDebug {
@@ -102,7 +102,7 @@ func main() {
 	jwtInstance := jwt.NewJWT(utcTimer, []byte(jwtSecret), time.Duration(15)*time.Minute, time.Duration(720)*time.Hour)
 
 	authRouter := authMux.NewMux(usersAdapter, utcTimer, jwtInstance)
-	if err := authRouter.SetPasswordHashCost(bcryptCostFromEnv(envHandler, log)); err != nil {
+	if err := authRouter.SetPasswordWorkLimits(passwordLimits); err != nil {
 		log.Fatalf("configure authentication: %s", err)
 	}
 	meRouter := meMux.NewMux(usersAdapter, utcTimer)
@@ -132,25 +132,4 @@ func main() {
 		IdleTimeout:  serverIdleTimeout,
 	}
 	log.Fatal(srv.ListenAndServe())
-}
-
-func intFromEnv(envHandler env.Handler, key env.Key, fallback int, log logger.Logger) int {
-	raw := envHandler.Env(key, strconv.Itoa(fallback))
-	value, err := strconv.Atoi(raw)
-	if err != nil {
-		log.Warnf("invalid integer config %s=%q, using %d", key, raw, fallback)
-		return fallback
-	}
-
-	return value
-}
-
-func bcryptCostFromEnv(envHandler env.Handler, log logger.Logger) int {
-	cost := intFromEnv(envHandler, config.ConfBcryptCost, defaultBcryptCost, log)
-	if cost < bcrypt.MinCost || cost > bcrypt.MaxCost {
-		log.Warnf("bcrypt cost %d is outside [%d,%d], using %d", cost, bcrypt.MinCost, bcrypt.MaxCost, defaultBcryptCost)
-		return defaultBcryptCost
-	}
-
-	return cost
 }
