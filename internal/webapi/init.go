@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
+	"whereiseveryone/internal/config"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/id"
@@ -16,8 +16,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 )
-
-const sessionLookupTimeout = 15 * time.Second
 
 type Router interface {
 	Route(g *echo.Group, authMiddleware echo.MiddlewareFunc)
@@ -69,6 +67,8 @@ type SessionReader interface {
 	GetSession(ctx context.Context, userID id.ID) (users.Auth, error)
 }
 
+// NewEcho shares one admission limit across auth and me routes. Optional limits
+// must be valid and supplied at most once; invalid initialization panics.
 func NewEcho(
 	basePath string,
 	validate *validator.Validate,
@@ -77,7 +77,22 @@ func NewEcho(
 	routers EchoRouters,
 	log logger.Logger,
 	_ bool, // Debug mode never changes public errors or disables correlated logging.
+	requestLimits ...config.DatabaseRequestLimits,
 ) *echo.Echo {
+	limits := config.DatabaseRequestLimits{
+		MaxRequests: config.DefaultMaxConcurrentDBRequests,
+		Timeout:     config.DefaultDBRequestTimeout,
+	}
+	if len(requestLimits) > 1 {
+		panic("supply database request limits only once")
+	}
+	if len(requestLimits) == 1 {
+		limits = requestLimits[0]
+	}
+	if err := limits.Validate(); err != nil {
+		panic(err)
+	}
+	admitDatabaseWork := databaseWorkAdmission(limits)
 	e := echo.New()
 	e.HTTPErrorHandler = publicHTTPErrorHandler
 	e.Validator = &echoValidator{validator: validate}
@@ -109,9 +124,7 @@ func NewEcho(
 			if err != nil || userID == id.ZeroID {
 				return c.String(http.StatusForbidden, "invalid token")
 			}
-			ctx, cancel := context.WithTimeout(c.Request().Context(), sessionLookupTimeout)
-			session, err := sessions.GetSession(ctx, userID)
-			cancel()
+			session, err := sessions.GetSession(c.Request().Context(), userID)
 			if err != nil {
 				if errors.Is(err, users.ErrUserNotExists) {
 					return c.String(http.StatusForbidden, "invalid session")
@@ -132,8 +145,8 @@ func NewEcho(
 	basePathGroup := e.Group(basePath)
 
 	e.GET("/swagger/*", routers.Swagger)
-	authRouter := basePathGroup.Group("/auth")
-	meRouter := basePathGroup.Group("/me", authMiddleware)
+	authRouter := basePathGroup.Group("/auth", admitDatabaseWork)
+	meRouter := basePathGroup.Group("/me", admitDatabaseWork, authMiddleware)
 
 	routers.AuthRouter.Route(authRouter, authMiddleware)
 	routers.MeRouter.Route(meRouter, authMiddleware)

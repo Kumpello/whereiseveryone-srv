@@ -24,13 +24,19 @@ func GetMongo(appCtx context.Context, env env.Handler) (*Collections, error) {
 }
 
 func LocalMongo(appCtx context.Context, env env.Handler) (*Collections, error) {
+	poolSize, err := config.MongoMaxPoolSizeFromEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("configure mongo pool: %w", err)
+	}
 	mongoURI := env.MustEnv(config.ConfMongoURI)
 	mongoAuthDB := env.MustEnv(config.ConfMongoAuthDb)
 	mongoUser := env.MustEnv(config.ConfMongoUser)
 	mongoPassword := env.MustEnv(config.ConfMongoPassword)
 	mongoDB := env.MustEnv(config.ConfMongoDb)
 
-	mongoCollections, err := NewMongoWithPassword(appCtx, mongoDB, mongoURI, mongoAuthDB, mongoUser, mongoPassword)
+	mongoCollections, err := NewMongoWithPassword(
+		appCtx, mongoDB, mongoURI, mongoAuthDB, mongoUser, mongoPassword, poolSize,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("init mongo: %w", err)
 	}
@@ -38,11 +44,15 @@ func LocalMongo(appCtx context.Context, env env.Handler) (*Collections, error) {
 }
 
 func CloudMongo(appCtx context.Context, env env.Handler) (*Collections, error) {
+	poolSize, err := config.MongoMaxPoolSizeFromEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("configure mongo pool: %w", err)
+	}
 	mongoURI := env.MustEnv(config.ConfMongoURI)
 	mongoCrt := env.MustEnv(config.ConfMongoX509)
 	mongoDB := env.MustEnv(config.ConfMongoDb)
 
-	mongoCollections, err := NewMongoWithX509Pem(appCtx, mongoDB, mongoURI, mongoCrt)
+	mongoCollections, err := NewMongoWithX509Pem(appCtx, mongoDB, mongoURI, mongoCrt, poolSize)
 	if err != nil {
 		return nil, fmt.Errorf("init mongo: %w", err)
 	}

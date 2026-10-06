@@ -47,6 +47,13 @@ matching `.env/docker.json`.
 Optional performance-related config:
 
 * `app.bcryptCost` - bcrypt work factor for new password hashes. Defaults to `14`.
+* `app.maxConcurrentDBRequests` - shared admission cap for `/auth/*` and `/me/*`. Defaults to `4`.
+* `app.dbRequestTimeoutSeconds` - one database-work deadline per admitted request. Defaults to `15` seconds.
+* `mongo.maxPoolSize` - connection-pool cap per MongoDB server. Defaults to `8`, overriding URI `maxPoolSize`.
+
+Values in JSON configuration are strings. The new limits are optional in existing
+files; omitted keys use these defaults. Nonpositive or malformed limits reject
+startup, including `mongo.maxPoolSize=0` (which would mean unlimited in the driver).
 
 ## Docker - srv
 
@@ -203,9 +210,9 @@ Attempts use fixed windows starting with the first attempt:
 
 Source and global quotas run before binding, including invalid requests. Username
 quotas run after validation and include successful and failed attempts at existing
-and nonexistent accounts; success does not reset them. Both routes share up to
-`min(GOMAXPROCS, 8)` admitted requests, held through lookup, bcrypt, and persistence.
-There is no waiting queue. Saturation or an exhausted quota returns generic HTTP
+and nonexistent accounts; success does not reset them. Both routes also share a
+password-work cap of `min(GOMAXPROCS, 8)`, held through lookup, bcrypt, and persistence.
+There is no waiting queue. Password admission saturation or an exhausted quota returns generic HTTP
 429 with `Retry-After` in seconds (one second for admission saturation).
 
 Sources use the socket peer address and ignore forwarding headers. IPv4-mapped
@@ -215,7 +222,71 @@ limits at the trusted gateway. Limiter storage holds at most 10,000 hashed keys,
 expires entries, and rejects new keys when full without evicting active budgets.
 Limits are in memory per server instance and reset on restart; multiple replicas
 require coordinated limits at the gateway or a shared limiter for deployment-wide
-quotas. No configuration keys, database migrations, or indexes are added.
+quotas. These authentication quotas do not add configuration keys, database
+migrations, or indexes.
+
+## Database work admission and temporary overload
+
+One shared cap admits **four requests per server instance** across all auth and
+me routes, including signup, login, refresh, friendship operations, and location
+uploads. Admission runs before the protected-route session lookup and before
+handler binding, bcrypt, or database calls. An admitted request holds its slot
+until its authentication and handler work return. Cancellation and errors release
+the slot when that work stops; a timeout does not release it prematurely while
+work is still running. Existing password-work admission and quotas also remain active.
+
+There is **no application waiting queue**. At capacity, the API immediately returns
+HTTP **503 Service Unavailable**, `Retry-After: 1`, and the usual sanitized JSON
+error (`code: 503`, `message: "internal error"`, `correlation_id`). The request ID
+also appears in `X-Request-ID`. No database work or token rotation has started for
+that rejected request. `/health`, Swagger, and routes outside those groups do not
+use a database-work slot. The existing request-body size check still runs first.
+
+All database calls for an admitted request share the same **15-second deadline**,
+starting at admission and spanning session authentication, binding, password work,
+and the handler. An earlier client/request deadline wins. Handlers can cancel
+their own child contexts without extending that deadline. This is a database-work
+budget, not a promise to interrupt bcrypt or a slow response writer at 15 seconds.
+Database failures and deadlines retain the existing generic 500 response; the
+503 admission response is the explicit signal that this request did not start work.
+
+Both password and X509 MongoDB connections explicitly cap each pool at **eight**
+connections. `mongo.maxPoolSize` takes precedence over `maxPoolSize` in the URI.
+Other URI settings remain effective; an existing `minPoolSize` must not exceed
+the configured cap. Without a URI minimum, connections open on demand. Driver
+monitoring sockets are separate from this pool limit. The pool cap controls
+connections, while request admission bounds callers that could wait for them;
+see the [MongoDB connection-pool documentation](https://www.mongodb.com/docs/drivers/go/current/connect/connection-options/connection-pools/).
+
+These are provisional defaults for low traffic on a small server, not measured
+deployment capacity. Current friend-page reads are sequential; request admission
+is not a per-query semaphore if a route adds parallel reads later. Multiple API
+instances each have their own admission cap and pools and share database resources.
+Measure latency, busy responses, and database/CPU usage before increasing the
+limits, and budget the aggregate across replicas.
+
+**Android retry contract:** Keep 503 separate from token expiration and token
+refresh. For an API admission response, wait at least `Retry-After` seconds and
+use bounded backoff with jitter, for example three total attempts with delays of
+at least one and two seconds. Preserve the location fix timestamp when retrying.
+A refresh rejected by admission has not consumed its credential, so it can be
+retried with the same current credential after the delay. An ambiguous network
+failure or another 5xx does not establish whether a write or refresh committed.
+Retry only when appropriate to the operation, and keep cancellation effective.
+The current Android location uploader already retries 503 with bounded 5/10-second
+delays. Refresh currently treats an HTTP 503 as a generic failure rather than
+retrying it; refresh handling and honoring `Retry-After` remain client follow-up
+work. This server change does not modify Android code.
+
+**Gateway/reverse proxy:** Apply a shared concurrency budget to auth and me routes
+consistent with the configured API cap (four for one instance), with prompt
+rejection or a small bounded queue. Keep health checks outside that budget.
+Preserve 503 and `Retry-After`, and disable transparent retries of writes and
+single-use refresh calls. A proxy upstream timeout should leave room for the API
+deadline, for example 20 seconds for the default 15-second budget, within the
+server's 30-second write timeout. Coordinate an aggregate budget when adding API
+replicas. This repository does not contain a deployed gateway configuration.
+No database migration or index change is required.
 
 # Development
 

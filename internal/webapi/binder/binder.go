@@ -3,7 +3,6 @@ package binder
 import (
 	"context"
 	"reflect"
-	"time"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/jsonerr"
 	"whereiseveryone/pkg/id"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/labstack/echo/v5"
 )
-
-const requestTimeout = 15 * time.Second
 
 // BaseContext is interface over Context without generic type
 // Allows to use Context without generic type
@@ -80,7 +77,7 @@ func BindRequest[T any](
 	var t T
 
 	// Obtain context and cancel
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), requestTimeout)
+	reqCtx, cancel := webapi.DatabaseRequestContext(c.Request().Context())
 	result.ctx = reqCtx
 	result.cancel = cancel
 

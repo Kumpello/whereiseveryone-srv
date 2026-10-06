@@ -91,6 +91,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             }
@@ -173,6 +185,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             }
@@ -239,6 +263,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -310,6 +346,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             },
@@ -371,6 +419,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -445,6 +505,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             }
@@ -508,6 +580,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -576,6 +660,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             }
@@ -634,6 +730,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             },
@@ -657,6 +765,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -692,6 +812,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -745,6 +877,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
                         }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
+                        }
                     }
                 }
             }
@@ -796,6 +940,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -857,6 +1013,18 @@ const docTemplate = `{
                         "description": "internal server error",
                         "schema": {
                             "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "server busy; retry after Retry-After seconds",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "string",
+                                "description": "Minimum delay in seconds before retrying (1)"
+                            }
                         }
                     }
                 }
@@ -1123,7 +1291,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "WhereIsEveryone",
-	Description:      "Request bodies: max 16 KiB (413); JSON bodies require application/json (415).",
+	Description:      "Bodies: max 16 KiB (413), application/json (415). Auth/me busy: 503 with Retry-After: 1.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

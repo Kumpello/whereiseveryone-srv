@@ -51,6 +51,8 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/status [PUT]
 func (m *mux) updateStatus(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[updateStatusRequest](c, true)
@@ -83,6 +85,8 @@ func (m *mux) updateStatus(c *echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid pagination parameters"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/friends [GET]
 func (m *mux) getFriends(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
@@ -135,6 +139,8 @@ func (m *mux) getFriends(c *echo.Context) error {
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/location [PUT]
 func (m *mux) updateLocation(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[updateLocationRequest](c, true)
@@ -175,6 +181,8 @@ func (m *mux) updateLocation(c *echo.Context) error {
 // @success 204
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/location [DELETE]
 func (m *mux) wipeLocation(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)
@@ -206,6 +214,8 @@ func (m *mux) wipeLocation(c *echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 409 {object} jsonerr.JSONError "friend or pending request limit reached"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/friend [POST]
 func (m *mux) befriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -272,6 +282,8 @@ func (m *mux) befriend(c *echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/friend [DELETE]
 func (m *mux) unfriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -311,6 +323,8 @@ func (m *mux) unfriend(c *echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 409 {object} jsonerr.JSONError "friend or pending request limit reached"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/friend/accept [POST]
 func (m *mux) acceptFriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -367,6 +381,8 @@ func (m *mux) acceptFriend(c *echo.Context) error {
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 404 {object} jsonerr.JSONError "requested user not exists"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/friend/reject [POST]
 func (m *mux) rejectFriend(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -416,6 +432,8 @@ func (m *mux) rejectFriend(c *echo.Context) error {
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/sharing/stop [POST]
 func (m *mux) stopSharing(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -460,6 +478,8 @@ func (m *mux) stopSharing(c *echo.Context) error {
 // @success 204
 // @failure 400 {object} jsonerr.JSONError "invalid request"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/sharing/resume [POST]
 func (m *mux) resumeSharing(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[friendRequest](c, true)
@@ -501,6 +521,8 @@ func (m *mux) resumeSharing(c *echo.Context) error {
 // @success 200 {object} getPausedResponse
 // @failure 401 {object} jsonerr.JSONError "invalid token"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /me/sharing [GET]
 func (m *mux) getPaused(c *echo.Context) error {
 	request, bindErr := binder.BindRequest[binder.EmptyBody](c, true)

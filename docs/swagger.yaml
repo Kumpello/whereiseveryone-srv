@@ -177,8 +177,8 @@ definitions:
     type: object
 info:
   contact: {}
-  description: 'Request bodies: max 16 KiB (413); JSON bodies require application/json
-    (415).'
+  description: 'Bodies: max 16 KiB (413), application/json (415). Auth/me busy: 503
+    with Retry-After: 1.'
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
@@ -231,6 +231,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: log in
@@ -289,6 +297,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: refresh auth tokens
       tags:
       - auth
@@ -333,6 +349,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: sign up as a new user
       tags:
       - auth
@@ -373,6 +397,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: remove friend
@@ -418,6 +450,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: send friend request
@@ -468,6 +508,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: accept friend request
       tags:
       - me
@@ -508,6 +556,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: reject friend request
@@ -557,6 +613,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: get friends details
       tags:
       - me
@@ -572,6 +636,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: wipe location
@@ -612,6 +684,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: update location
       tags:
       - me
@@ -633,6 +713,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: get paused friends details
@@ -669,6 +757,14 @@ paths:
           description: internal server error
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
       summary: resume sharing location
       tags:
       - me
@@ -701,6 +797,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: stop sharing location
@@ -741,6 +845,14 @@ paths:
             $ref: '#/definitions/jsonerr.JSONError'
         "500":
           description: internal server error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: server busy; retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Minimum delay in seconds before retrying (1)
+              type: string
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: update status

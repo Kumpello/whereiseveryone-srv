@@ -39,7 +39,7 @@ const (
 
 // @title WhereIsEveryone
 // @version 1.0
-// @description Request bodies: max 16 KiB (413); JSON bodies require application/json (415).
+// @description Bodies: max 16 KiB (413), application/json (415). Auth/me busy: 503 with Retry-After: 1.
 
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
@@ -70,6 +70,10 @@ func main() {
 	jwtSecret, err := config.JWTSecret(envHandler)
 	if err != nil {
 		log.Fatalf("invalid configuration: %s", err)
+	}
+	requestLimits, err := config.DatabaseRequestLimitsFromEnv(envHandler)
+	if err != nil {
+		log.Fatalf("invalid database request limits: %s", err)
 	}
 
 	isDebug := envHandler.MustEnv(config.ConfDebug) == "true"
@@ -115,7 +119,8 @@ func main() {
 			MeRouter:   meRouter,
 		},
 		log,
-		isDebug)
+		isDebug,
+		requestLimits)
 
 	// Start server
 	port := envHandler.MustEnv(config.ConfAppPort)

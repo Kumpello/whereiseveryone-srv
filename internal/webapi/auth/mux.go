@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	authRequestTimeout    = 15 * time.Second
 	maxPasswordOperations = 8
 	// This is a valid cost-14 bcrypt hash used only for dummy verification.
 	// Matching it never authenticates a nonexistent account.
@@ -166,9 +165,11 @@ func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, in
 // @failure 429 {object} jsonerr.JSONError "too many requests; see Retry-After"
 // @failure 409 {object} jsonerr.JSONError "conflict (user with such a name exists)
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /auth/signup [POST]
 func (m *mux) signUp(c *echo.Context) error {
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
+	reqCtx, cancel := webapi.DatabaseRequestContext(c.Request().Context())
 	defer cancel()
 
 	var request signUpRequest
@@ -253,9 +254,11 @@ func (m *mux) signUp(c *echo.Context) error {
 // @failure 429 {object} jsonerr.JSONError "too many requests; see Retry-After"
 // @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /auth/login [POST]
 func (m *mux) logIn(c *echo.Context) error {
-	reqCtx, cancel := context.WithTimeout(c.Request().Context(), authRequestTimeout)
+	reqCtx, cancel := webapi.DatabaseRequestContext(c.Request().Context())
 	defer cancel()
 
 	var request logInRequest
@@ -334,12 +337,11 @@ func (m *mux) logIn(c *echo.Context) error {
 // @failure 404 {object} jsonerr.JSONError "user not exists"
 // @failure 409 {object} map[string]string "device token conflict; session revoked, log in again"
 // @failure 500 {object} jsonerr.JSONError "internal server error"
+// @failure 503 {object} jsonerr.JSONError "server busy; retry after Retry-After seconds"
+// @header 503 {string} Retry-After "Minimum delay in seconds before retrying (1)"
 // @router /auth/refresh [POST]
 func (m *mux) refreshToken(c *echo.Context) error {
-	reqCtx, cancel := context.WithTimeout(
-		c.Request().Context(),
-		authRequestTimeout,
-	)
+	reqCtx, cancel := webapi.DatabaseRequestContext(c.Request().Context())
 	defer cancel()
 
 	var request refreshTokenRequest
