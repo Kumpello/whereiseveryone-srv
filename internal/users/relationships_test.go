@@ -85,14 +85,17 @@ func TestMongoFriendPages(t *testing.T) {
 				t.Fatal("unbounded peer read")
 			}
 			for _, entry := range page.Entries {
-				if entry.User.ID != ids[seen] || entry.User.Auth.Password != "" {
-					t.Fatal("page order or credential projection changed")
+				if entry.Peer.ID != ids[seen] {
+					t.Fatal("page order changed")
 				}
-				if state == FriendListAccepted && (entry.FriendSince == nil || !entry.FriendSince.Equal(since[entry.User.ID.Hex()])) {
+				if state == FriendListAccepted && (entry.FriendSince == nil || !entry.FriendSince.Equal(since[entry.Peer.ID.Hex()])) {
 					t.Fatal("page lost friendship metadata")
 				}
 				if state != FriendListAccepted && entry.FriendSince != nil {
 					t.Fatal("pending metadata leaked")
+				}
+				if state != FriendListAccepted && (entry.Peer.Status != "" || entry.Peer.Location != nil || entry.Peer.LocationVisible) {
+					t.Fatal("pending peer projection fetched private profile fields")
 				}
 				seen++
 			}

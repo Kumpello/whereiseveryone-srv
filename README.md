@@ -362,6 +362,18 @@ between lists. Pending entries still omit status and location. MongoDB sends at
 most `limit + 1` relationship IDs and at most `limit` peer documents per page;
 accepted friendship timestamps are projected only for those IDs.
 
+Pending pages fetch only peer IDs and usernames. Accepted pages fetch username,
+status, location, and one viewer-specific visibility flag computed by MongoDB;
+they no longer transfer friends' pause lists or scan them in the HTTP handler.
+The handler includes location only when that flag allows it. Missing or null
+pause lists retain the existing sharing behavior, legacy hex-string IDs are
+recognized, and unconvertible pause entries conservatively suppress location.
+`GET /me/sharing` reads only the viewer's paused IDs and matching usernames,
+without loading the viewer's full profile or peers' status/location data.
+API responses and configuration are unchanged; no index or migration changes
+are needed. Local query measurements are in
+[performance-list-projections-benchmarks.txt](docs/performance-list-projections-benchmarks.txt).
+
 Each account may have **2,048 accepted friends**, **256 incoming requests**, and
 **256 outgoing requests**. Sending checks both users' accepted capacity, the
 sender's outgoing capacity, and the recipient's incoming capacity. Acceptance

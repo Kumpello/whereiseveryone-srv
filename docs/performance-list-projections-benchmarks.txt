@@ -1,0 +1,45 @@
+List projections — 2026-10-06
+Go 1.27.1; MongoDB 7 isolated local replica set; no race detector.
+50 peers per batch, each with a 1,024-character ASCII status and a location.
+legacy: existing GetUsers projection (username/status/location/full pause list).
+accepted: production peer projection with a viewer-specific visibility flag.
+names: production ID/username-only projection used by pending and sharing lists.
+returned_BSON_B counts document bytes, excluding command/protocol overhead.
+These are short local query benchmarks, not deployment latency/capacity results.
+
+Command:
+MONGO_TEST_URI='mongodb://127.0.0.1:27028/?replicaSet=rs0&directConnection=true' go test -p=1 -run '^$' -bench '^BenchmarkMongoListProjections$' -benchmem -benchtime=200ms -count=3 ./internal/users
+
+goos: linux
+goarch: amd64
+pkg: whereiseveryone/internal/users
+cpu: AMD Ryzen 5 5600H with Radeon Graphics         
+BenchmarkMongoListProjections/peers=50/paused=0/legacy-12         	     138	   1731569 ns/op	     59200 returned_BSON_B	  464120 B/op	    2218 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/legacy-12         	     138	   1710073 ns/op	     59200 returned_BSON_B	  463862 B/op	    2217 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/legacy-12         	     141	   1691882 ns/op	     59200 returned_BSON_B	  463956 B/op	    2218 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/accepted-12       	     133	   1798354 ns/op	     58650 returned_BSON_B	  444124 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/accepted-12       	     129	   1827307 ns/op	     58650 returned_BSON_B	  444195 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/accepted-12       	     128	   1853468 ns/op	     58650 returned_BSON_B	  444270 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/names-12          	     184	   1291443 ns/op	      2200 returned_BSON_B	  250485 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/names-12          	     180	   1308140 ns/op	      2200 returned_BSON_B	  250488 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=0/names-12          	     180	   1310671 ns/op	      2200 returned_BSON_B	  250568 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/legacy-12      	      14	  17800692 ns/op	    903700 returned_BSON_B	 6497531 B/op	  102827 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/legacy-12      	      13	  17488228 ns/op	    903700 returned_BSON_B	 6497480 B/op	  102827 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/legacy-12      	      13	  17516809 ns/op	    903700 returned_BSON_B	 6497768 B/op	  102827 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/accepted-12    	      20	  12378295 ns/op	     58650 returned_BSON_B	  444458 B/op	    2029 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/accepted-12    	      20	  11542664 ns/op	     58650 returned_BSON_B	  444534 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/accepted-12    	      20	  11627609 ns/op	     58650 returned_BSON_B	  444143 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/names-12       	     180	   1325890 ns/op	      2200 returned_BSON_B	  250327 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/names-12       	     182	   1315740 ns/op	      2200 returned_BSON_B	  250424 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=1000/names-12       	     181	   1299743 ns/op	      2200 returned_BSON_B	  250554 B/op	    1061 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/legacy-12     	       2	 141830524 ns/op	   9003700 returned_BSON_B	80402020 B/op	 1003175 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/legacy-12     	       2	 142065122 ns/op	   9003700 returned_BSON_B	80402420 B/op	 1003176 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/legacy-12     	       2	 146969872 ns/op	   9003700 returned_BSON_B	80402324 B/op	 1003175 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/accepted-12   	       3	  93262711 ns/op	     58650 returned_BSON_B	  443210 B/op	    2028 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/accepted-12   	       3	  99881812 ns/op	     58650 returned_BSON_B	  445029 B/op	    2030 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/accepted-12   	       3	  97538215 ns/op	     58650 returned_BSON_B	  443200 B/op	    2027 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/names-12      	     180	   1299528 ns/op	      2200 returned_BSON_B	  249320 B/op	    1059 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/names-12      	     193	   1238908 ns/op	      2200 returned_BSON_B	  249865 B/op	    1060 allocs/op
+BenchmarkMongoListProjections/peers=50/paused=10000/names-12      	     182	   1267314 ns/op	      2200 returned_BSON_B	  249501 B/op	    1059 allocs/op
+PASS
+ok  	whereiseveryone/internal/users	12.260s

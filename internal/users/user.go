@@ -61,6 +61,7 @@ type Adapter interface {
 
 	GetUser(ctx context.Context, userID id.ID) (User, error)
 	GetUsers(ctx context.Context, ids []id.ID) ([]User, error)
+	GetPausedUsers(ctx context.Context, viewer id.ID) ([]UserName, error)
 	GetFriendPage(ctx context.Context, viewer id.ID, query FriendPageQuery) (FriendPage, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetPendingIncomingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)

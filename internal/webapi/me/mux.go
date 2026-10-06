@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/binder"
@@ -111,9 +110,9 @@ func (m *mux) getFriends(c *echo.Context) error {
 	}
 	result := getFriendsResponse{Items: make([]friendDetails, 0, len(page.Entries)), NextCursor: next}
 	for _, entry := range page.Entries {
-		u := entry.User
-		friend := newFriendDetails(u.Auth.Username, u.Status, friendState(query.State), entry.FriendSince)
-		if query.State == users.FriendListAccepted && u.Location != nil && !slices.Contains(u.PausedUsers, request.UserID()) {
+		u := entry.Peer
+		friend := newFriendDetails(u.Username, u.Status, friendState(query.State), entry.FriendSince)
+		if query.State == users.FriendListAccepted && u.Location != nil && u.LocationVisible {
 			friend.Location = &locationDetails{
 				Longitude: u.Location.Longitude, Latitude: u.Location.Latitude,
 				Altitude: u.Location.Altitude, Bearing: u.Location.Bearing,
@@ -533,24 +532,16 @@ func (m *mux) getPaused(c *echo.Context) error {
 
 	ctx := request.Context()
 
-	user, err := m.userAdapter.GetUser(ctx, request.UserID())
-	if err != nil {
-		return jsonerr.EchoInternalError(err).Echo(c)
-	}
-
 	result := make(getPausedResponse, 0)
 
-	pausedUsers, err := m.userAdapter.GetUsers(
-		ctx,
-		user.PausedUsers,
-	)
+	pausedUsers, err := m.userAdapter.GetPausedUsers(ctx, request.UserID())
 	if err != nil {
 		return jsonerr.EchoInternalError(err).Echo(c)
 	}
 
 	for _, f := range pausedUsers {
 		pausedFriend := pausedFriendDetails{
-			Username: f.Auth.Username,
+			Username: f.Username,
 		}
 		result = append(result, pausedFriend)
 	}

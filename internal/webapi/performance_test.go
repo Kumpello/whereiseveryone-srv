@@ -155,8 +155,13 @@ func fixtureFriendPage(viewer users.User, members map[id.ID]users.User, incoming
 		page.NextID = ids[len(ids)-1]
 	}
 	for _, peer := range ids {
-		entry := users.FriendEntry{User: members[peer]}
+		user := members[peer]
+		entry := users.FriendEntry{Peer: users.FriendPeer{
+			UserName: users.UserName{ID: user.ID, Username: user.Auth.Username},
+		}}
 		if query.State == users.FriendListAccepted {
+			entry.Peer.Status, entry.Peer.Location = user.Status, user.Location
+			entry.Peer.LocationVisible = !slices.Contains(user.PausedUsers, viewer.ID)
 			entry.FriendSince = viewer.FriendSinceFor(peer)
 		}
 		page.Entries = append(page.Entries, entry)
@@ -374,6 +379,9 @@ func BenchmarkHTTPLocation(b *testing.B) {
 	}
 }
 
+// The fake adapter computes visibility from fixtures, so this benchmark still
+// includes simulated membership work. BenchmarkMongoListProjections measures
+// the production queries and their returned BSON rather than this simulation.
 func BenchmarkHTTPFriendsPausedLists(b *testing.B) {
 	for _, pausedCount := range []int{0, 1000} {
 		b.Run(fmt.Sprintf("friends=1000/paused_per_friend=%d", pausedCount), func(b *testing.B) {

@@ -37,9 +37,9 @@ type FriendPageQuery struct {
 	Limit int
 }
 
-// FriendEntry includes only the viewer's friendship metadata for one peer.
+// FriendEntry includes a projected peer and only the viewer's friendship metadata.
 type FriendEntry struct {
-	User        User
+	Peer        FriendPeer
 	FriendSince *time.Time
 }
 
@@ -77,17 +77,21 @@ func (m *mongoUserAdapter) GetFriendPage(ctx context.Context, viewer id.ID, quer
 		ids = ids[:query.Limit]
 		page.NextID = ids[len(ids)-1]
 	}
-	peers, err := m.GetUsers(ctx, ids)
+	projection := userNameProjection()
+	if query.State == FriendListAccepted {
+		projection = friendPeerProjection(viewer)
+	}
+	peers, err := readProjectedUsers[FriendPeer](ctx, m, ids, projection)
 	if err != nil {
 		return FriendPage{}, fmt.Errorf("read friend page peers: %w", err)
 	}
-	byID := make(map[id.ID]User, len(peers))
+	byID := make(map[id.ID]FriendPeer, len(peers))
 	for _, peer := range peers {
 		byID[peer.ID] = peer
 	}
 	for _, peerID := range ids {
 		if peer, exists := byID[peerID]; exists {
-			page.Entries = append(page.Entries, FriendEntry{User: peer, FriendSince: metadata.FriendSinceFor(peerID)})
+			page.Entries = append(page.Entries, FriendEntry{Peer: peer, FriendSince: metadata.FriendSinceFor(peerID)})
 		}
 	}
 	return page, nil

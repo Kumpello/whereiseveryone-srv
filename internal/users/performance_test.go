@@ -56,6 +56,8 @@ func TestMongoHotQueriesUseIndexes(t *testing.T) {
 		{name: "session_by_id", collection: "users", filter: withUserId(ids[0]), returned: 1},
 		{name: "login_by_username", collection: "users", filter: bson.M{"auth.username": "user-0"}, returned: 1},
 		{name: "friends_batch", collection: "users", filter: bson.M{"_id": bson.M{"$in": ids[:16]}}, returned: 16},
+		{name: "accepted_peer_projection", collection: "users", filter: bson.M{"_id": bson.M{"$in": ids[:16]}}, projection: friendPeerProjection(ids[0]), returned: 16},
+		{name: "username_only_projection", collection: "users", filter: bson.M{"_id": bson.M{"$in": ids[:16]}}, projection: userNameProjection(), returned: 16},
 		{name: "location_timestamp_guard", collection: "users", filter: bson.M{"_id": ids[0], "$or": bson.A{
 			bson.M{"location.last_update": bson.M{"$exists": false}},
 			bson.M{"location.last_update": bson.M{"$lt": clock.now.Add(time.Minute)}},
