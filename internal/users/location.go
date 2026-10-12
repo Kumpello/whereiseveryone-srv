@@ -19,12 +19,14 @@ type Location struct {
 	Latitude float64 `bson:"latitude"`
 	// Altitude
 	Altitude float64 `bson:"altitude,omitempty"`
-	// Bearing
-	Bearing float64 `bson:"bearing,omitempty"`
+	// Bearing is GPS course in degrees; nil means the fix has no course measurement.
+	Bearing *float64 `bson:"bearing,omitempty"`
 	// Accuracy
 	Accuracy float64 `bson:"accuracy,omitempty"`
-	// Speed
-	Speed float64 `bson:"speed,omitempty"`
+	// Speed in m/s; nil means unavailable, zero means stationary.
+	Speed *float64 `bson:"speed,omitempty"`
+	// CarMode indicates that the user enabled the driving display.
+	CarMode bool `bson:"car_mode"`
 	// LastUpdate
 	LastUpdate time.Time `bson:"last_update"`
 }

@@ -1207,7 +1207,13 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "bearing": {
-                    "type": "number"
+                    "description": "GPS course in degrees; null is unavailable, 0 is north.",
+                    "type": "number",
+                    "x-nullable": true
+                },
+                "car_mode": {
+                    "description": "CarMode indicates that the user enabled car mode.",
+                    "type": "boolean"
                 },
                 "last_update": {
                     "description": "LastUpdate is the location fix time in Unix milliseconds (UTC).",
@@ -1221,7 +1227,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "speed": {
-                    "type": "number"
+                    "description": "Speed in m/s; null means unavailable, zero means stationary.",
+                    "type": "number",
+                    "x-nullable": true
                 }
             }
         },
@@ -1246,7 +1254,13 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "bearing": {
-                    "type": "number"
+                    "description": "GPS course in degrees; null is unavailable, 0 is north.",
+                    "type": "number",
+                    "x-nullable": true
+                },
+                "car_mode": {
+                    "description": "CarMode indicates that the user enabled car mode.",
+                    "type": "boolean"
                 },
                 "last_update": {
                     "description": "LastUpdate is the location fix time in Unix milliseconds (UTC).",
@@ -1260,7 +1274,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "speed": {
-                    "type": "number"
+                    "description": "Speed in m/s; null means unavailable, zero means stationary.",
+                    "type": "number",
+                    "x-nullable": true
                 }
             }
         },

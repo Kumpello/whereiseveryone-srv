@@ -54,7 +54,7 @@ func TestMongoLocationOnlyReplacesOlderFixes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first := Location{Longitude: 21, Latitude: 52, LastUpdate: clock.now}
+	first := Location{Longitude: 21, Latitude: 52, CarMode: true, LastUpdate: clock.now}
 	if err := adapter.UpdateLocation(ctx, user.ID, first); err != nil {
 		t.Fatal(err)
 	}

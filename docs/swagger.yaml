@@ -127,7 +127,12 @@ definitions:
       altitude:
         type: number
       bearing:
+        description: GPS course in degrees; null is unavailable, 0 is north.
         type: number
+        x-nullable: true
+      car_mode:
+        description: CarMode indicates that the user enabled car mode.
+        type: boolean
       last_update:
         description: LastUpdate is the location fix time in Unix milliseconds (UTC).
         format: int64
@@ -137,7 +142,9 @@ definitions:
       longitude:
         type: number
       speed:
+        description: Speed in m/s; null means unavailable, zero means stationary.
         type: number
+        x-nullable: true
     required:
     - last_update
     type: object
@@ -153,7 +160,12 @@ definitions:
       altitude:
         type: number
       bearing:
+        description: GPS course in degrees; null is unavailable, 0 is north.
         type: number
+        x-nullable: true
+      car_mode:
+        description: CarMode indicates that the user enabled car mode.
+        type: boolean
       last_update:
         description: LastUpdate is the location fix time in Unix milliseconds (UTC).
         format: int64
@@ -163,7 +175,9 @@ definitions:
       longitude:
         type: number
       speed:
+        description: Speed in m/s; null means unavailable, zero means stationary.
         type: number
+        x-nullable: true
     required:
     - last_update
     type: object

@@ -90,9 +90,13 @@ type locationDetails struct {
 	Longitude float64 `json:"longitude"`
 	Latitude  float64 `json:"latitude"`
 	Altitude  float64 `json:"altitude,omitempty"`
-	Bearing   float64 `json:"bearing,omitempty"`
-	Accuracy  float64 `json:"accuracy,omitempty"`
-	Speed     float64 `json:"speed,omitempty"`
+	// GPS course in degrees; null is unavailable, 0 is north.
+	Bearing  *float64 `json:"bearing" extensions:"x-nullable"`
+	Accuracy float64  `json:"accuracy,omitempty"`
+	// Speed in m/s; null means unavailable, zero means stationary.
+	Speed *float64 `json:"speed" extensions:"x-nullable"`
+	// CarMode indicates that the user enabled car mode.
+	CarMode bool `json:"car_mode"`
 
 	// LastUpdate is the location fix time in Unix milliseconds (UTC).
 	LastUpdate timestamp `json:"last_update" swaggertype:"integer" format:"int64" binding:"required"`

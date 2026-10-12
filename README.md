@@ -411,6 +411,18 @@ support transactions. Test containers should also run with `--replSet rs0` and
 be initialized before the regression suite.
 
 Location uploads (`PUT /me/location`) require `last_update` as a positive integer
+in Unix milliseconds. They also carry `car_mode` as a boolean and `speed` in meters
+per second (null/omitted if unavailable, zero if measured stationary). Eligible
+accepted-friend locations return the same car-mode flag and speed measurement.
+Both fields retain the location timestamp guard and existing friendship privacy
+checks. No MongoDB index or schema migration is required for these fields.
+
+Car-mode contract review: routes, HTTP methods, authentication, JSON content type,
+and the 16 KiB request limit are unchanged. The Android app and backend should be
+released together. Live Cloudflare and Hetzner protection checks remain required
+before production deployment; they were not performed during local implementation.
+
+The `last_update` value must be a positive integer
 in Unix milliseconds (UTC), representing when the fix was measured. The server
 rejects missing, null, malformed, and out-of-range timestamps with 400 before
 writing to the database. The accepted window is from 24 hours before server receipt

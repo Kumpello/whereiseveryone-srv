@@ -56,7 +56,7 @@ func TestHTTPFriendsUseProjectedVisibility(t *testing.T) {
 				Status:   "friend status", LocationVisible: tc.visible,
 			}
 			if tc.located {
-				peer.Location = &users.Location{Latitude: 52, Longitude: 21}
+				peer.Location = &users.Location{Latitude: 52, Longitude: 21, CarMode: true}
 			}
 			store := &projectedListStore{page: users.FriendPage{Entries: []users.FriendEntry{{Peer: peer}}}}
 			e := echo.New()
@@ -82,6 +82,15 @@ func TestHTTPFriendsUseProjectedVisibility(t *testing.T) {
 			}
 			entry := page.Items[0]
 			_, hasLocation := entry["location"]
+			if hasLocation {
+				var location map[string]json.RawMessage
+				if err := json.Unmarshal(entry["location"], &location); err != nil {
+					t.Fatal(err)
+				}
+				if string(location["car_mode"]) != "true" {
+					t.Fatalf("visible driver's car mode missing: %s", response.Body.String())
+				}
+			}
 			_, hasStatus := entry["status"]
 			if hasLocation != (tc.state == users.FriendListAccepted && tc.visible && tc.located) ||
 				hasStatus != (tc.state == users.FriendListAccepted) {

@@ -117,6 +117,7 @@ func (m *mux) getFriends(c *echo.Context) error {
 				Longitude: u.Location.Longitude, Latitude: u.Location.Latitude,
 				Altitude: u.Location.Altitude, Bearing: u.Location.Bearing,
 				Accuracy: u.Location.Accuracy, Speed: u.Location.Speed,
+				CarMode:    u.Location.CarMode,
 				LastUpdate: newTimestamp(u.Location.LastUpdate),
 			}
 		}
@@ -163,6 +164,7 @@ func (m *mux) updateLocation(c *echo.Context) error {
 		Bearing:    newLoc.Bearing,
 		Accuracy:   newLoc.Accuracy,
 		Speed:      newLoc.Speed,
+		CarMode:    newLoc.CarMode,
 		LastUpdate: lastUpdate,
 	})
 	if err != nil {
