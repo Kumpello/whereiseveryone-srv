@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"whereiseveryone/internal/config"
+	"whereiseveryone/internal/restore"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	"whereiseveryone/internal/webapi/jsonerr"
@@ -38,6 +39,7 @@ type mux struct {
 	dummyPasswordHash string
 	verifyPassword    func(string, string) error
 	throttle          *authThrottle
+	restore           *restore.Service
 }
 
 func NewMux(
@@ -127,10 +129,20 @@ func (m *mux) verifyLoginPassword(hash, password string, found bool) bool {
 	return found && passwordErr == nil
 }
 
-func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
+// SetRestoreService configures system-managed key ceremonies before serving requests.
+func (m *mux) SetRestoreService(service *restore.Service) {
+	m.restore = service
+}
+
+func (m *mux) Route(g *echo.Group, authMiddleware echo.MiddlewareFunc) {
 	g.POST("/signup", m.signUp, m.throttleSource(true), webapi.RequireJSON)
 	g.POST("/login", m.logIn, m.throttleSource(false), webapi.RequireJSON)
 	g.POST("/refresh", m.refreshToken, webapi.RequireJSON)
+	g.POST("/restore/register/options", m.restoreRegistrationOptions,
+		authMiddleware, m.throttleRestore, webapi.RequireJSON)
+	g.POST("/restore/register/finish", m.finishRestoreRegistration, authMiddleware, m.throttleRestore, webapi.RequireJSON)
+	g.POST("/restore/login/options", m.restoreAuthenticationOptions, m.throttleRestore, webapi.RequireJSON)
+	g.POST("/restore/login/finish", m.finishRestoreAuthentication, m.throttleRestore, webapi.RequireJSON)
 }
 
 func (m *mux) handleDeviceTokenConflict(ctx context.Context, user users.User, incomingDeviceToken string) (bool, error) {

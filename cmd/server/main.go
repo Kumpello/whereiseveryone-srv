@@ -12,6 +12,7 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger/v2"
 
 	"whereiseveryone/internal/mongo"
+	"whereiseveryone/internal/restore"
 	"whereiseveryone/internal/users"
 	"whereiseveryone/internal/webapi"
 	authMux "whereiseveryone/internal/webapi/auth"
@@ -75,6 +76,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid password work limits: %s", err)
 	}
+	restoreSettings, err := config.RestoreCredentialsFromEnv(envHandler)
+	if err != nil {
+		log.Fatalf("invalid restore credential settings: %s", err)
+	}
 
 	isDebug := envHandler.MustEnv(config.ConfDebug) == "true"
 	if isDebug {
@@ -91,10 +96,15 @@ func main() {
 	}
 	defer mongoCollections.Disconnect(appCtx)
 	usersAdapter := users.NewMongoAdapter(mongoCollections.Users, mongoCollections.PendingFriendRequests, utcTimer, log)
+	restoreStore := restore.NewMongoStore(mongoCollections.Users.Database())
 	indexCtx, cancelIndexCreation := context.WithTimeout(appCtx, indexCreationTimeout)
 	if err := usersAdapter.EnsureIndexes(indexCtx); err != nil {
 		cancelIndexCreation()
 		log.Fatalf("ensure mongo indexes: %s", err.Error())
+	}
+	if indexErr := restoreStore.EnsureIndexes(indexCtx); indexErr != nil {
+		cancelIndexCreation()
+		log.Fatalf("ensure restore indexes: %s", indexErr)
 	}
 	cancelIndexCreation()
 
@@ -105,6 +115,11 @@ func main() {
 	if err := authRouter.SetPasswordWorkLimits(passwordLimits); err != nil {
 		log.Fatalf("configure authentication: %s", err)
 	}
+	restoreService, err := restore.NewService(restoreSettings, restoreStore, utcTimer)
+	if err != nil {
+		log.Fatalf("configure restore credentials: %s", err)
+	}
+	authRouter.SetRestoreService(restoreService)
 	meRouter := meMux.NewMux(usersAdapter, utcTimer)
 
 	validate := validator.New()

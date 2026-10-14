@@ -19,11 +19,11 @@ type logInRequest struct {
 }
 
 type authResponse struct {
-	// ID is user id (uuid)
+	// ID is the user's MongoDB ObjectID
 	ID string `json:"id"`
-	// Token access token for Bearer authentication; must match the current stored session
+	// Token is the current access token for Bearer authentication
 	Token string `json:"token"`
-	// RefreshToken refresh-only token for /auth/refresh; cannot be used as a Bearer token
+	// RefreshToken is used only by /auth/refresh, not Bearer authentication
 	RefreshToken string `json:"refresh_token"`
 }
 

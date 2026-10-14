@@ -3,15 +3,13 @@ definitions:
   auth.authResponse:
     properties:
       id:
-        description: ID is user id (uuid)
+        description: ID is the user's MongoDB ObjectID
         type: string
       refresh_token:
-        description: RefreshToken refresh-only token for /auth/refresh; cannot be
-          used as a Bearer token
+        description: RefreshToken is used only by /auth/refresh, not Bearer authentication
         type: string
       token:
-        description: Token access token for Bearer authentication; must match the
-          current stored session
+        description: Token is the current access token for Bearer authentication
         type: string
     type: object
   auth.logInRequest:
@@ -46,6 +44,52 @@ definitions:
     required:
     - device_token
     - refresh_token
+    type: object
+  auth.restoreAuthResponse:
+    properties:
+      id:
+        description: ID is the user's MongoDB ObjectID
+        type: string
+      refresh_token:
+        description: RefreshToken is used only by /auth/refresh, not Bearer authentication
+        type: string
+      token:
+        description: Token is the current access token for Bearer authentication
+        type: string
+      username:
+        type: string
+    type: object
+  auth.restoreFinishRequest:
+    properties:
+      app_id:
+        maxLength: 256
+        type: string
+      challenge_id:
+        maxLength: 128
+        type: string
+      credential_json:
+        maxLength: 12288
+        type: string
+      device_token:
+        maxLength: 256
+        type: string
+    required:
+    - app_id
+    - challenge_id
+    - credential_json
+    - device_token
+    type: object
+  auth.restoreOptionsRequest:
+    properties:
+      app_id:
+        maxLength: 256
+        type: string
+      device_token:
+        maxLength: 256
+        type: string
+    required:
+    - app_id
+    - device_token
     type: object
   auth.signUpRequest:
     properties:
@@ -189,6 +233,13 @@ definitions:
         maxLength: 1024
         type: string
     type: object
+  restore.Options:
+    properties:
+      challenge_id:
+        type: string
+      request_json:
+        type: string
+    type: object
 info:
   contact: {}
   description: 'Bodies: max 16 KiB (413), application/json (415). Auth/me busy: 503
@@ -320,6 +371,215 @@ paths:
           schema:
             $ref: '#/definitions/jsonerr.JSONError'
       summary: refresh auth tokens
+      tags:
+      - auth
+  /auth/restore/login/finish:
+    post:
+      consumes:
+      - application/json
+      description: Verify a silent restore assertion and move the session to the new
+        device.
+      parameters:
+      - description: authentication assertion
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.restoreFinishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.restoreAuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: sign in with a transferred Android restore key
+      tags:
+      - auth
+  /auth/restore/login/options:
+    post:
+      consumes:
+      - application/json
+      description: Issue a five-minute one-use challenge for restore sign-in.
+      parameters:
+      - description: application and destination device
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.restoreOptionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/restore.Options'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: create Android restore-key authentication options
+      tags:
+      - auth
+  /auth/restore/register/finish:
+    post:
+      consumes:
+      - application/json
+      description: Validate and persist an account-owned Android restore key.
+      parameters:
+      - description: registration response
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.restoreFinishRequest'
+      responses:
+        "204":
+          description: registered
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      security:
+      - Bearer: []
+      summary: verify and save a system-managed Android restore key
+      tags:
+      - auth
+  /auth/restore/register/options:
+    post:
+      consumes:
+      - application/json
+      description: Create account-bound options to enroll an Android restore key.
+      parameters:
+      - description: application and source device
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.restoreOptionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/restore.Options'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      security:
+      - Bearer: []
+      summary: create Android restore-key registration options
       tags:
       - auth
   /auth/signup:

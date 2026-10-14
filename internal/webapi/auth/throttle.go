@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v5"
+	"whereiseveryone/internal/restore"
 	"whereiseveryone/internal/webapi/jsonerr"
 )
 
@@ -31,6 +32,8 @@ const (
 	signupSource
 	signupAccount
 	signupGlobal
+	restoreSource
+	restoreGlobal
 )
 
 type quotaKey struct {
@@ -152,5 +155,19 @@ func (m *mux) throttleSource(signup bool) echo.MiddlewareFunc {
 			}
 			return next(c)
 		}
+	}
+}
+
+func (m *mux) throttleRestore(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		if m.restore == nil {
+			return restoreError(c, restore.ErrDisabled)
+		}
+		if retry := m.throttle.allow(m.timer.Now(),
+			newQuota(restoreSource, authSource(c.Request().RemoteAddr), 60, 5*time.Minute),
+			newQuota(restoreGlobal, "", 1000, 5*time.Minute)); retry > 0 {
+			return tooManyRequests(c, retry)
+		}
+		return next(c)
 	}
 }

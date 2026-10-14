@@ -201,6 +201,326 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/restore/login/finish": {
+            "post": {
+                "description": "Verify a silent restore assertion and move the session to the new device.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "sign in with a transferred Android restore key",
+                "parameters": [
+                    {
+                        "description": "authentication assertion",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.restoreFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.restoreAuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/restore/login/options": {
+            "post": {
+                "description": "Issue a five-minute one-use challenge for restore sign-in.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "create Android restore-key authentication options",
+                "parameters": [
+                    {
+                        "description": "application and destination device",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.restoreOptionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/restore.Options"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/restore/register/finish": {
+            "post": {
+                "description": "Validate and persist an account-owned Android restore key.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "verify and save a system-managed Android restore key",
+                "parameters": [
+                    {
+                        "description": "registration response",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.restoreFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "registered"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
+        "/auth/restore/register/options": {
+            "post": {
+                "description": "Create account-bound options to enroll an Android restore key.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "create Android restore-key registration options",
+                "parameters": [
+                    {
+                        "description": "application and source device",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.restoreOptionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/restore.Options"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/jsonerr.JSONError"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ]
+            }
+        },
         "/auth/signup": {
             "post": {
                 "description": "creates a new user",
@@ -1036,15 +1356,15 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "description": "ID is user id (uuid)",
+                    "description": "ID is the user's MongoDB ObjectID",
                     "type": "string"
                 },
                 "refresh_token": {
-                    "description": "RefreshToken refresh-only token for /auth/refresh; cannot be used as a Bearer token",
+                    "description": "RefreshToken is used only by /auth/refresh, not Bearer authentication",
                     "type": "string"
                 },
                 "token": {
-                    "description": "Token access token for Bearer authentication; must match the current stored session",
+                    "description": "Token is the current access token for Bearer authentication",
                     "type": "string"
                 }
             }
@@ -1090,6 +1410,70 @@ const docTemplate = `{
                     "description": "RefreshToken is an encoded JWT of at most 4096 bytes",
                     "type": "string",
                     "maxLength": 4096
+                }
+            }
+        },
+        "auth.restoreAuthResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "ID is the user's MongoDB ObjectID",
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "description": "RefreshToken is used only by /auth/refresh, not Bearer authentication",
+                    "type": "string"
+                },
+                "token": {
+                    "description": "Token is the current access token for Bearer authentication",
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.restoreFinishRequest": {
+            "type": "object",
+            "required": [
+                "app_id",
+                "challenge_id",
+                "credential_json",
+                "device_token"
+            ],
+            "properties": {
+                "app_id": {
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "challenge_id": {
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "credential_json": {
+                    "type": "string",
+                    "maxLength": 12288
+                },
+                "device_token": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
+        },
+        "auth.restoreOptionsRequest": {
+            "type": "object",
+            "required": [
+                "app_id",
+                "device_token"
+            ],
+            "properties": {
+                "app_id": {
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "device_token": {
+                    "type": "string",
+                    "maxLength": 256
                 }
             }
         },
@@ -1287,6 +1671,17 @@ const docTemplate = `{
                     "description": "Status is at most 1024 characters; an empty string clears the status.",
                     "type": "string",
                     "maxLength": 1024
+                }
+            }
+        },
+        "restore.Options": {
+            "type": "object",
+            "properties": {
+                "challenge_id": {
+                    "type": "string"
+                },
+                "request_json": {
+                    "type": "string"
                 }
             }
         }
