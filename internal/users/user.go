@@ -32,6 +32,8 @@ type User struct {
 	FriendSince map[string]time.Time `bson:"friend_since,omitempty"`
 	// PausedUsers list of IDs user has paused sharing location with
 	PausedUsers []id.ID `bson:"paused_users"`
+	// PointsOfInterest are bounded to five and shared with eligible accepted friends.
+	PointsOfInterest []PointOfInterest `bson:"points_of_interest,omitempty"`
 }
 
 func (u User) SubscribeUser(id id.ID) bool {
@@ -63,6 +65,10 @@ type Adapter interface {
 	GetUsers(ctx context.Context, ids []id.ID) ([]User, error)
 	GetPausedUsers(ctx context.Context, viewer id.ID) ([]UserName, error)
 	GetFriendPage(ctx context.Context, viewer id.ID, query FriendPageQuery) (FriendPage, error)
+	GetPointsOfInterest(ctx context.Context, owner id.ID) ([]PointOfInterest, error)
+	CreatePointOfInterest(ctx context.Context, owner id.ID, point PointOfInterest) (PointOfInterest, error)
+	UpdatePointOfInterest(ctx context.Context, owner id.ID, pointID id.ID, point PointOfInterest) (PointOfInterest, error)
+	DeletePointOfInterest(ctx context.Context, owner id.ID, pointID id.ID) error
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetPendingIncomingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)
 	GetPendingOutgoingFriendRequestUserIDs(ctx context.Context, user id.ID) ([]id.ID, error)

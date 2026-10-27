@@ -2,6 +2,9 @@
 
 ## Go
 
+Saved map points, their ownership and sharing rules, and API rollout notes are
+documented in [Points of interest](docs/points-of-interest.md).
+
 It's a standard go app. You can run it using `go run` etc.
 
 Use Go 1.27.1 and MongoDB 4.4 or newer (required by MongoDB driver v2).

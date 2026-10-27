@@ -115,7 +115,7 @@ func TestMongoIdentityOnlyListsIgnoreUnneededFields(t *testing.T) {
 	}
 	for _, state := range []FriendListState{FriendListIncoming, FriendListOutgoing} {
 		page, pageErr := adapter.GetFriendPage(ctx, viewer.ID, FriendPageQuery{State: state, Limit: 50})
-		if pageErr != nil || len(page.Entries) != 1 || page.Entries[0].Peer != (FriendPeer{UserName: want}) {
+		if pageErr != nil || len(page.Entries) != 1 || !reflect.DeepEqual(page.Entries[0].Peer, FriendPeer{UserName: want}) {
 			t.Fatalf("%s page=%+v, error=%v", state, page, pageErr)
 		}
 	}

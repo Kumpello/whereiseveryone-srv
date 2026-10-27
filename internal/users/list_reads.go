@@ -19,10 +19,11 @@ type UserName struct {
 // FriendPeer contains accepted-list fields and a viewer-specific visibility decision.
 // It is a projected view, not a complete User.
 type FriendPeer struct {
-	UserName        `bson:",inline"`
-	Status          string    `bson:"status"`
-	Location        *Location `bson:"location"`
-	LocationVisible bool      `bson:"location_visible"`
+	UserName         `bson:",inline"`
+	Status           string            `bson:"status"`
+	Location         *Location         `bson:"location"`
+	LocationVisible  bool              `bson:"location_visible"`
+	PointsOfInterest []PointOfInterest `bson:"points_of_interest"`
 }
 
 func userNameProjection() bson.M {
@@ -34,6 +35,7 @@ func friendPeerProjection(viewer id.ID) bson.M {
 	projection := userNameProjection()
 	projection["status"] = 1
 	projection[locationField] = 1
+	projection[pointsOfInterestField] = 1
 	// Match the driver's legacy hex-string ID decoding. Unconvertible entries
 	// conservatively hide location rather than bypassing a possible pause.
 	pausedIDs := bson.M{"$map": bson.M{

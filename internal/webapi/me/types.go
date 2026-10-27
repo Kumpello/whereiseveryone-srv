@@ -68,10 +68,11 @@ type getFriendsResponse struct {
 type friendDetails struct {
 	Username string `json:"username"`
 	// Status is present only for accepted friends, even when empty.
-	Status      *string          `json:"status,omitempty"`
-	State       friendState      `json:"state"`
-	Location    *locationDetails `json:"location,omitempty"`
-	FriendSince *timestamp       `json:"friend_since"`
+	Status           *string                 `json:"status,omitempty"`
+	State            friendState             `json:"state"`
+	Location         *locationDetails        `json:"location,omitempty"`
+	FriendSince      *timestamp              `json:"friend_since"`
+	PointsOfInterest []pointOfInterestDetail `json:"points_of_interest,omitempty"`
 }
 
 func newFriendDetails(username, status string, state friendState, friendSince *time.Time) friendDetails {

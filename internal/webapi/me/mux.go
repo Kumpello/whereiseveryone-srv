@@ -34,6 +34,10 @@ func (m *mux) Route(g *echo.Group, _ echo.MiddlewareFunc) {
 	g.POST("/sharing/stop", m.stopSharing, webapi.RequireJSON)
 	g.POST("/sharing/resume", m.resumeSharing, webapi.RequireJSON)
 	g.GET("/sharing", m.getPaused)
+	g.GET("/points", m.getPointsOfInterest)
+	g.POST("/points", m.createPointOfInterest, webapi.RequireJSON)
+	g.PUT("/points/:id", m.updatePointOfInterest, webapi.RequireJSON)
+	g.DELETE("/points/:id", m.deletePointOfInterest)
 }
 
 // updateStatus
@@ -120,6 +124,9 @@ func (m *mux) getFriends(c *echo.Context) error {
 				CarMode:    u.Location.CarMode,
 				LastUpdate: newTimestamp(u.Location.LastUpdate),
 			}
+		}
+		if query.State == users.FriendListAccepted {
+			friend.PointsOfInterest = pointOfInterestDetails(u.PointsOfInterest, u.Username)
 		}
 		result.Items = append(result.Items, friend)
 	}

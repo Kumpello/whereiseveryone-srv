@@ -130,6 +130,10 @@ definitions:
         type: string
       location:
         $ref: '#/definitions/me.locationDetails'
+      points_of_interest:
+        items:
+          $ref: '#/definitions/me.pointOfInterestDetail'
+        type: array
       state:
         $ref: '#/definitions/me.friendState'
       status:
@@ -196,6 +200,45 @@ definitions:
     properties:
       username:
         type: string
+    type: object
+  me.pointOfInterestDetail:
+    properties:
+      created_at:
+        format: int64
+        type: integer
+      creator_username:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+    type: object
+  me.pointOfInterestRequest:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      latitude:
+        maximum: 90
+        minimum: -90
+        type: number
+      longitude:
+        maximum: 180
+        minimum: -180
+        type: number
+      name:
+        maxLength: 64
+        type: string
+    required:
+    - latitude
+    - longitude
+    - name
     type: object
   me.updateLocationRequest:
     properties:
@@ -969,6 +1012,174 @@ paths:
       summary: update location
       tags:
       - me
+  /me/points:
+    get:
+      description: At most five own points. Friends' eligible points are included
+        in GET /me/friends.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/me.pointOfInterestDetail'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: Get your saved points of interest
+      tags:
+      - points
+    post:
+      consumes:
+      - application/json
+      description: Up to five per user. The server assigns identity, creator and creation
+        time.
+      parameters:
+      - description: Name, optional description, and coordinates
+        in: body
+        name: point
+        required: true
+        schema:
+          $ref: '#/definitions/me.pointOfInterestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/me.pointOfInterestDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "409":
+          description: five-point limit reached
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: Create a point of interest
+      tags:
+      - points
+  /me/points/{id}:
+    delete:
+      description: Only the owner may delete a point; deletion frees a point slot.
+      parameters:
+      - description: Point ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: Delete one of your points of interest
+      tags:
+      - points
+    put:
+      consumes:
+      - application/json
+      description: Only the owner may edit a point. Identity and creation time remain
+        unchanged.
+      parameters:
+      - description: Point ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated name, description and coordinates
+        in: body
+        name: point
+        required: true
+        schema:
+          $ref: '#/definitions/me.pointOfInterestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/me.pointOfInterestDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/jsonerr.JSONError'
+      summary: Edit one of your points of interest
+      tags:
+      - points
   /me/sharing:
     get:
       description: returns list of friends with whom location sharing is paused
