@@ -44,6 +44,29 @@ func newMongoTestDatabase(t *testing.T) (context.Context, *mongo.Database) {
 	return ctx, db
 }
 
+func TestMongoNewUserCanPauseSharingWithOmittedList(t *testing.T) {
+	ctx, adapter := newRelationshipTestStore(t)
+	owner, err := adapter.NewUser(ctx, User{Auth: Auth{Username: "new-owner"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer := seedRelationshipUser(ctx, t, adapter, 0)
+	if err := adapter.StopSharing(ctx, owner.ID, peer.ID); err != nil {
+		t.Fatalf("pause sharing for a newly created account: %v", err)
+	}
+	paused, err := adapter.GetPausedUsers(ctx, owner.ID)
+	if err != nil || len(paused) != 1 || paused[0].ID != peer.ID {
+		t.Fatalf("paused users = %+v, error = %v", paused, err)
+	}
+	if err := adapter.ResumeSharing(ctx, owner.ID, peer.ID); err != nil {
+		t.Fatal(err)
+	}
+	paused, err = adapter.GetPausedUsers(ctx, owner.ID)
+	if err != nil || len(paused) != 0 {
+		t.Fatalf("resumed users = %+v, error = %v", paused, err)
+	}
+}
+
 func TestMongoLocationOnlyReplacesOlderFixes(t *testing.T) {
 	ctx, db := newMongoTestDatabase(t)
 	log := logrus.New()

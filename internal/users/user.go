@@ -156,6 +156,9 @@ func (m *mongoUserAdapter) EnsureIndexes(ctx context.Context) error {
 
 func (m *mongoUserAdapter) NewUser(ctx context.Context, user User) (User, error) {
 	user.ID = id.NewID()
+	if user.PausedUsers == nil {
+		user.PausedUsers = []id.ID{}
+	}
 	_, err := m.coll.InsertOne(ctx, user)
 	if err != nil {
 		var writeErr mongo.WriteException
